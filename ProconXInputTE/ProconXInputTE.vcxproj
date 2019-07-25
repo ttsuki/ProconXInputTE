@@ -167,6 +167,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <ForcedIncludeFiles />
     </ClCompile>
+    <ClCompile Include="HidapiDeviceCollection.cpp" />
     <ClCompile Include="ProconXInputTE.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
@@ -174,6 +175,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\hidapi\hidapi\hidapi.h" />
+    <ClInclude Include="IUncopyable.h" />
+    <ClInclude Include="HidapiDeviceCollection.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>

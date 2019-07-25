@@ -1,0 +1,1 @@
+#include "HidapiDeviceCollection.h"

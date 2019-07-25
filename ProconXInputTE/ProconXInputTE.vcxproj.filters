@@ -6,6 +6,7 @@
     <ClCompile Include="..\ThirdParty\hidapi\windows\hid.c">
       <Filter>hidapi</Filter>
     </ClCompile>
+    <ClCompile Include="HidapiDeviceCollection.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="hidapi">
@@ -17,6 +18,8 @@
     <ClInclude Include="..\ThirdParty\hidapi\hidapi\hidapi.h">
       <Filter>hidapi</Filter>
     </ClInclude>
+    <ClInclude Include="HidapiDeviceCollection.h" />
+    <ClInclude Include="IUncopyable.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\ThirdParty\hidapi\LICENSE-orig.txt">
