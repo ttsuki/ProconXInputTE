@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="ProconXInputTE.cpp" />
+    <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="..\ThirdParty\hidapi\windows\hid.c">
+      <Filter>hidapi</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="hidapi">
+      <UniqueIdentifier>{11cff6f6-a33e-47ab-b610-f4574edc902e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="stdafx.h" />
+    <ClInclude Include="..\ThirdParty\hidapi\hidapi\hidapi.h">
+      <Filter>hidapi</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\ThirdParty\hidapi\LICENSE-orig.txt">
+      <Filter>hidapi</Filter>
+    </Text>
+  </ItemGroup>
+</Project>
