@@ -6,11 +6,22 @@
     <ClCompile Include="..\ThirdParty\hidapi\windows\hid.c">
       <Filter>hidapi</Filter>
     </ClCompile>
-    <ClCompile Include="HidapiDeviceCollection.cpp" />
+    <ClCompile Include="ProConIO\HidDevice.cpp">
+      <Filter>ProconIO</Filter>
+    </ClCompile>
+    <ClCompile Include="ProConIO\HidDeviceCollection.cpp">
+      <Filter>ProconIO</Filter>
+    </ClCompile>
+    <ClCompile Include="ProConIO\ProController.cpp">
+      <Filter>ProconIO</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="hidapi">
       <UniqueIdentifier>{11cff6f6-a33e-47ab-b610-f4574edc902e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ProconIO">
+      <UniqueIdentifier>{499e74e7-15e9-42c9-a2cb-53f32a538b46}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -18,8 +29,15 @@
     <ClInclude Include="..\ThirdParty\hidapi\hidapi\hidapi.h">
       <Filter>hidapi</Filter>
     </ClInclude>
-    <ClInclude Include="HidapiDeviceCollection.h" />
-    <ClInclude Include="IUncopyable.h" />
+    <ClInclude Include="ProConIO\HidDevice.h">
+      <Filter>ProconIO</Filter>
+    </ClInclude>
+    <ClInclude Include="ProConIO\HidDeviceCollection.h">
+      <Filter>ProconIO</Filter>
+    </ClInclude>
+    <ClInclude Include="ProConIO\ProController.h">
+      <Filter>ProconIO</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\ThirdParty\hidapi\LICENSE-orig.txt">
