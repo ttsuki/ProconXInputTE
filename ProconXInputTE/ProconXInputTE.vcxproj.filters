@@ -15,6 +15,7 @@
     <ClCompile Include="ProConIO\ProController.cpp">
       <Filter>ProconIO</Filter>
     </ClCompile>
+    <ClCompile Include="ViGEmClient.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="hidapi">
@@ -38,6 +39,7 @@
     <ClInclude Include="ProConIO\ProController.h">
       <Filter>ProconIO</Filter>
     </ClInclude>
+    <ClInclude Include="ViGEmClient.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\ThirdParty\hidapi\LICENSE-orig.txt">

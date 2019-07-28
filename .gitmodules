@@ -1,3 +1,6 @@
 [submodule "ThirdParty/hidapi"]
 	path = ThirdParty/hidapi
 	url = https://github.com/signal11/hidapi.git
+[submodule "ThirdParty/ViGEmClient"]
+	path = ThirdParty/ViGEmClient
+	url = https://github.com/ViGEm/ViGEmClient
