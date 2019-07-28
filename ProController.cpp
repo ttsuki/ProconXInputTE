@@ -7,6 +7,7 @@
 #include <hidapi.h>
 
 #include "HidDevice.h"
+#include "SysDep.h"
 
 namespace ProControllerHid
 {
@@ -41,6 +42,7 @@ namespace ProControllerHid
 
 		std::function<void(const InputStatus& status)> statusCallback_{};
 		bool statusCallbackEnabled_{};
+		std::mutex statusCallbackCalling_{};
 
 	public:
 		ProControllerImpl(const hid_device_info* devInfo, int index,
@@ -69,6 +71,7 @@ namespace ProControllerHid
 		std::function<void(const InputStatus& status)> statusCallback)
 	{
 		rumbleStatus_ = { 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40 };
+		playerLedStatus_ = 0x3 | index << 2;
 
 		if (!OpenDevice(devInfo->path))
 		{
@@ -79,31 +82,41 @@ namespace ProControllerHid
 		SendUsbCommand(0x03, {}, true); // Set baudrate to 3Mbps
 		SendUsbCommand(0x02, {}, true); // Handshake
 		SendUsbCommand(0x04, {}, false); // HID only-mode(No use Bluetooth)
+		std::this_thread::sleep_for(std::chrono::milliseconds(16));
 
 		SendSubCommand(0x40, { 0x00 }, true); // disable imuData
 		SendSubCommand(0x48, { 0x01 }, true); // enable Rumble
-		SendSubCommand(0x38, { 0x2F, 0x10, 0x11, 0x33, 0x33 }, true); // Set HOME Light
-		SendSubCommand(0x30, { playerLedStatus_ = 0x3 | index << 2 }, true);
+		SendSubCommand(0x38, { 0x2F, 0x10, 0x11, 0x33, 0x33 }, true); // Set HOME Light animation
+		SendSubCommand(0x30, { playerLedStatus_ }, true); // Set Player LED Status
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(16));
 
 		statusCallback_ = std::move(statusCallback);
 		running_.test_and_set();
 		controllerUpdaterThread_ = std::thread([this]
 			{
+				SysDep::SetThreadPriorityToRealtime();
+
 				decltype(playerLedStatus_) playerLedStatus = 0;
+				auto clock = std::chrono::steady_clock::now();
 
 				while (running_.test_and_set())
 				{
 					if (playerLedStatus != playerLedStatus_)
 					{
 						playerLedStatus = playerLedStatus_;
-						SendSubCommand(0x30, { playerLedStatus_ }, false);
+						SendSubCommand(0x30, { playerLedStatus }, false);
+						// TODO: build subcommand queue and retrying...?
 					}
 					else
 					{
 						SendRumble();
 					}
-					std::this_thread::sleep_for(std::chrono::milliseconds(16));
+					clock = std::max(clock + std::chrono::milliseconds(16),
+						std::chrono::steady_clock::now() + std::chrono::milliseconds(8));
+					std::this_thread::sleep_until(clock);
 				}
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			}
 		);
 	}
@@ -115,20 +128,22 @@ namespace ProControllerHid
 			running_.clear();
 			controllerUpdaterThread_.join();
 		}
-
-		SendSubCommand(0x38, { 0x00 }, true); // Set HOME Light
+		std::this_thread::sleep_for(std::chrono::milliseconds(120));
+		SendSubCommand(0x38, { 0x00 }, true); // Set HOME Light animation
 		SendSubCommand(0x30, { 0x00 }, true); // Set Player LED
-		//ExecSubCommand(0x06, { 0x00 }, true); // Set HCI state (sleep mode)
 		SendUsbCommand(0x05, {}, false); // Allows the Joy-Con or Pro Controller to time out and talk Bluetooth again.
+		//ExecSubCommand(0x06, { 0x00 }, false); // Set HCI state (sleep mode)
 	}
 
 	void ProControllerImpl::StartStatusCallback()
 	{
+		std::lock_guard<decltype(statusCallbackCalling_)> lock(statusCallbackCalling_);
 		statusCallbackEnabled_ = true;
 	}
 
 	void ProControllerImpl::StopStatusCallback()
 	{
+		std::lock_guard<decltype(statusCallbackCalling_)> lock(statusCallbackCalling_);
 		statusCallbackEnabled_ = false;
 	}
 
@@ -163,7 +178,7 @@ namespace ProControllerHid
 				{
 					if (r[0] == 0x81 && r[1] == usbCommand)
 					{
-						DumpPacket("UsbAck<", data, 0, 2);
+						DumpPacket("UsbAck<", r, 0, 2);
 						return true;
 					}
 					return false;
@@ -192,7 +207,7 @@ namespace ProControllerHid
 				{
 					if (r[0] == 0x21 && r[14] == subCommand)
 					{
-						DumpPacket("SubAck<", data, 14, 8);
+						DumpPacket("SubAck<", r, 14, 8);
 						return true;
 					}
 					return false;
@@ -251,14 +266,18 @@ namespace ProControllerHid
 		lStick.raw = data[6] | data[7] << 8 | data[8] << 16;
 		rStick.raw = data[9] | data[10] << 8 | data[11] << 16;
 
-		if (statusCallbackEnabled_ && statusCallback_)
+		InputStatus status = {};
+		status.clock = tick();
+		status.LeftStick = lStick.status;
+		status.RightStick = rStick.status;
+		status.Buttons = buttons.status;
+
 		{
-			InputStatus status = {};
-			status.clock = tick();
-			status.LeftStick = lStick.status;
-			status.RightStick = rStick.status;
-			status.Buttons = buttons.status;
-			statusCallback_(status);
+			std::lock_guard<decltype(statusCallbackCalling_)> lock(statusCallbackCalling_);
+			if (statusCallbackEnabled_ && statusCallback_)
+			{
+				statusCallback_(status);
+			}
 		}
 	}
 

@@ -1,4 +1,5 @@
 #include "HidDevice.h"
+#include "SysDep.h"
 
 namespace ProControllerHid
 {
@@ -70,6 +71,7 @@ namespace ProControllerHid
 				running_.test_and_set();
 				receiverThread_ = std::thread([this]
 					{
+						SysDep::SetThreadPriorityToRealtime();
 						while (running_.test_and_set())
 						{
 							Buffer data = device_.ReceivePacket(10);
