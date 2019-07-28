@@ -18,33 +18,39 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
-    <ProjectGuid>{C9E05F13-0630-4A55-8450-7A3F64C892B2}</ProjectGuid>
-    <RootNamespace>ViGEmClient</RootNamespace>
+    <ProjectGuid>{EF7B5EBD-2A9C-4D22-BA4A-BCDBF31D5A75}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>boost</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v142</PlatformToolset>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v142</PlatformToolset>
     <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
@@ -67,116 +73,112 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <OutDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir)../ThirdParty/ViGEmClient/include;$(IncludePath)</IncludePath>
+    <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(ProjectDir)../ThirdParty/ViGEmClient/include;$(IncludePath)</IncludePath>
-    <OutDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</OutDir>
-    <IntDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</IntDir>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)../ThirdParty/ViGEmClient/include;$(IncludePath)</IncludePath>
+    <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir)../ThirdParty/ViGEmClient/include;$(IncludePath)</IncludePath>
+    <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)build\$(ProjectName)_$(PlatformTarget)$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <PreprocessorDefinitions>BOOST_ALL_NO_LIB;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\Client.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\Common.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\Util.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\km\BusShared.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\Internal.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.cpp" />
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\ViGEmClient.cpp" />
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\boost-min\boost.vcxproj">
-      <Project>{ef7b5ebd-2a9c-4d22-ba4a-bcdbf31d5a75}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\boost.1.70.0.0\build\boost.targets" Condition="Exists('..\packages\boost.1.70.0.0\build\boost.targets')" />
+    <Import Project="..\packages\boost_thread-src.1.70.0.0\build\boost_thread-src.targets" Condition="Exists('..\packages\boost_thread-src.1.70.0.0\build\boost_thread-src.targets')" />
+    <Import Project="..\packages\boost_date_time-src.1.70.0.0\build\boost_date_time-src.targets" Condition="Exists('..\packages\boost_date_time-src.1.70.0.0\build\boost_date_time-src.targets')" />
+    <Import Project="..\packages\boost_chrono-src.1.70.0.0\build\boost_chrono-src.targets" Condition="Exists('..\packages\boost_chrono-src.1.70.0.0\build\boost_chrono-src.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>このプロジェクトは、このコンピューター上にない NuGet パッケージを参照しています。それらのパッケージをダウンロードするには、[NuGet パッケージの復元] を使用します。詳細については、http://go.microsoft.com/fwlink/?LinkID=322105 を参照してください。見つからないファイルは {0} です。</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('..\packages\boost.1.70.0.0\build\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost.1.70.0.0\build\boost.targets'))" />
+    <Error Condition="!Exists('..\packages\boost_thread-src.1.70.0.0\build\boost_thread-src.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost_thread-src.1.70.0.0\build\boost_thread-src.targets'))" />
+    <Error Condition="!Exists('..\packages\boost_date_time-src.1.70.0.0\build\boost_date_time-src.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost_date_time-src.1.70.0.0\build\boost_date_time-src.targets'))" />
+    <Error Condition="!Exists('..\packages\boost_chrono-src.1.70.0.0\build\boost_chrono-src.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\boost_chrono-src.1.70.0.0\build\boost_chrono-src.targets'))" />
   </Target>
 </Project>
