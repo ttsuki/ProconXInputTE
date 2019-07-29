@@ -5,10 +5,12 @@
 
 #include "../ProControllerHid/HidDeviceCollection.h"
 #include "../ProControllerHid/ProController.h"
-#include "ViGEmClient.h"
+#include "../ViGEmClient/ViGEmClientCpp.h"
 
 namespace ProconXInputTE
 {
+	using namespace ViGEm;
+
 	constexpr unsigned short kNintendoVID{ 0x057E };
 	constexpr unsigned short kProControllerPID{ 0x2009 };
 

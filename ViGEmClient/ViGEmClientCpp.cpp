@@ -1,8 +1,11 @@
-#include "ViGEmClient.h"
-#include <utility>
-#include "../ThirdParty/ViGEmClient/include/ViGEm/Client.h"
+#include "ViGEmClientCpp.h"
+#include <wtypes.h>
+#include <map>
+#include <mutex>
 
-namespace ProconXInputTE
+#include "ViGEm/Client.h"
+
+namespace ViGEm
 {
 	template <class T, class TValue>
 	class ThreadSafeMap

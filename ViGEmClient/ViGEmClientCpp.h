@@ -1,7 +1,8 @@
 #pragma once
-#include <map>
+#include <memory>
+#include <functional>
 
-namespace ProconXInputTE
+namespace ViGEm
 {
 	struct X360InputStatus
 	{

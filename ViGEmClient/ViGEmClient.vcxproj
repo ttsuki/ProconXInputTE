@@ -155,11 +155,13 @@
     <ClInclude Include="..\ThirdParty\ViGEmClient\src\Internal.h" />
     <ClInclude Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.h" />
     <ClInclude Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.h" />
+    <ClInclude Include="ViGEmClientCpp.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.cpp" />
     <ClCompile Include="..\ThirdParty\ViGEmClient\src\ViGEmClient.cpp" />
     <ClCompile Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.cpp" />
+    <ClCompile Include="ViGEmClientCpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
