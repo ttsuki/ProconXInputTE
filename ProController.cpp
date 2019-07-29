@@ -1,13 +1,17 @@
 #include "ProController.h"
 
-#include <array>
 #include <algorithm>
 #include <thread>
 #include <chrono>
+
+#include <hidapi.h>
+
 #include "HidDevice.h"
 
-namespace ProconXInputTE
+namespace ProControllerHid
 {
+	using Buffer = HidIo::Buffer;
+
 	static uint64_t tick()
 	{
 		using namespace std::chrono;
@@ -26,7 +30,42 @@ namespace ProconXInputTE
 #endif
 	}
 
-	ProController::ProController(const hid_device_info* devInfo, int index,
+	class ProControllerImpl final : HidIo::HidDeviceThreaded, public ProController
+	{
+		uint8_t nextPacketNumber_{};
+		HidIo::Buffer rumbleStatus_{};
+		uint8_t playerLedStatus_{};
+
+		std::thread controllerUpdaterThread_{};
+		std::atomic_flag running_{ ATOMIC_FLAG_INIT };
+
+		std::function<void(const InputStatus& status)> statusCallback_{};
+		bool statusCallbackEnabled_{};
+
+	public:
+		ProControllerImpl(const hid_device_info* devInfo, int index,
+			std::function<void(const InputStatus& status)> statusCallback);
+		~ProControllerImpl() override;
+		
+		void StartStatusCallback() override;
+		void StopStatusCallback() override;
+
+		void SetRumbleBasic(
+			uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp, uint8_t rightHighAmp,
+			uint8_t leftLowFreq, uint8_t rightLowFreq, uint8_t leftHighFreq, uint8_t rightHighFreq) override;
+
+		void SetPlayerLed(uint8_t playerLed) override;
+
+	private:
+		void SendUsbCommand(uint8_t usbCommand, const HidIo::Buffer& data, bool waitAck);
+		void SendSubCommand(uint8_t subCommand, const HidIo::Buffer& data, bool waitAck);
+		void SendRumble();
+
+		void OnPacket(const HidIo::Buffer& data) override;
+		void OnStatus(const HidIo::Buffer& data);
+	};
+
+	ProControllerImpl::ProControllerImpl(const hid_device_info* devInfo, int index,
 		std::function<void(const InputStatus& status)> statusCallback)
 	{
 		rumbleStatus_ = { 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40 };
@@ -69,7 +108,7 @@ namespace ProconXInputTE
 		);
 	}
 
-	ProController::~ProController()
+	ProControllerImpl::~ProControllerImpl()
 	{
 		if (controllerUpdaterThread_.joinable())
 		{
@@ -83,7 +122,17 @@ namespace ProconXInputTE
 		SendUsbCommand(0x05, {}, false); // Allows the Joy-Con or Pro Controller to time out and talk Bluetooth again.
 	}
 
-	void ProController::SetRumbleBasic(
+	void ProControllerImpl::StartStatusCallback()
+	{
+		statusCallbackEnabled_ = true;
+	}
+
+	void ProControllerImpl::StopStatusCallback()
+	{
+		statusCallbackEnabled_ = false;
+	}
+
+	void ProControllerImpl::SetRumbleBasic(
 		uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp, uint8_t rightHighAmp,
 		uint8_t leftLowFreq, uint8_t rightLowFreq, uint8_t leftHighFreq, uint8_t rightHighFreq)
 	{
@@ -94,12 +143,12 @@ namespace ProconXInputTE
 		rumbleStatus_[4] = r, rumbleStatus_[5] = r >> 8, rumbleStatus_[6] = r >> 16, rumbleStatus_[7] = r >> 24;
 	}
 
-	void ProController::SetPlayerLed(uint8_t playerLed)
+	void ProControllerImpl::SetPlayerLed(uint8_t playerLed)
 	{
 		playerLedStatus_ = playerLed;
 	}
 
-	void ProController::SendUsbCommand(uint8_t usbCommand, const Buffer& data, bool waitAck)
+	void ProControllerImpl::SendUsbCommand(uint8_t usbCommand, const Buffer& data, bool waitAck)
 	{
 		Buffer buf = {
 			0x80,
@@ -126,7 +175,7 @@ namespace ProconXInputTE
 		}
 	}
 
-	void ProController::SendSubCommand(uint8_t subCommand, const Buffer& data, bool waitAck)
+	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer& data, bool waitAck)
 	{
 		Buffer buf = {
 			0x01, // SubCommand
@@ -155,7 +204,7 @@ namespace ProconXInputTE
 		}
 	}
 
-	void ProController::SendRumble()
+	void ProControllerImpl::SendRumble()
 	{
 		Buffer buf = {
 			0x10,
@@ -166,7 +215,7 @@ namespace ProconXInputTE
 		SendPacket(buf);
 	}
 
-	void ProController::OnPacket(const Buffer& data)
+	void ProControllerImpl::OnPacket(const Buffer& data)
 	{
 		if (data.size())
 		{
@@ -184,7 +233,7 @@ namespace ProconXInputTE
 		}
 	}
 
-	void ProController::OnStatus(const Buffer& data)
+	void ProControllerImpl::OnStatus(const Buffer& data)
 	{
 		union
 		{
@@ -202,7 +251,7 @@ namespace ProconXInputTE
 		lStick.raw = data[6] | data[7] << 8 | data[8] << 16;
 		rStick.raw = data[9] | data[10] << 8 | data[11] << 16;
 
-		if (statusCallback_)
+		if (statusCallbackEnabled_ && statusCallback_)
 		{
 			InputStatus status = {};
 			status.clock = tick();
@@ -211,5 +260,18 @@ namespace ProconXInputTE
 			status.Buttons = buttons.status;
 			statusCallback_(status);
 		}
+	}
+
+	std::unique_ptr<ProController> ProController::Connect(const hid_device_info* devInfo, int index,
+		std::function<void(const InputStatus& status)> statusCallback)
+	{
+		return std::make_unique<ProControllerImpl>(devInfo, index, statusCallback);
+	}
+
+	HidDeviceCollection EnumerateProControllers()
+	{
+		constexpr unsigned short kNintendoVID{ 0x057E };
+		constexpr unsigned short kProControllerPID{ 0x2009 };
+		return HidDeviceCollection::EnumerateDevices(kNintendoVID, kProControllerPID);
 	}
 }
