@@ -3,8 +3,8 @@
 #include <Windows.h>
 #include <conio.h>
 
-#include "ProconIO/HidDeviceCollection.h"
-#include "ProconIO/ProController.h"
+#include "../ProControllerHid/HidDeviceCollection.h"
+#include "../ProControllerHid/ProController.h"
 #include "ViGEmClient.h"
 
 namespace ProconXInputTE
