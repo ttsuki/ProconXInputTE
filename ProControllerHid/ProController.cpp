@@ -93,10 +93,10 @@ namespace ProControllerHid
 
 		statusCallback_ = std::move(statusCallback);
 		running_.test_and_set();
-		controllerUpdaterThread_ = std::thread([this]
+		controllerUpdaterThread_ = std::thread([this, path = std::string(devInfo->path)]
 			{
 				SysDep::SetThreadPriorityToRealtime();
-
+				SysDep::SetThreadName((std::string(path) + "-UpdaterThread").c_str());
 				decltype(playerLedStatus_) playerLedStatus = 0;
 				auto clock = std::chrono::steady_clock::now();
 
