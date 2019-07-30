@@ -17,9 +17,12 @@ namespace ProconXInputTE
 
 		struct RumbleParams
 		{
-			uint8_t Frequency;
-			uint8_t DecaySpeed;
-			uint8_t MaxAmplitude;
+			struct Act
+			{
+				uint8_t Frequency;
+				uint8_t DecaySpeed;
+				uint8_t MaxAmplitude;
+			} Left, Right;
 		};
 
 		void SetRumbleParameter(RumbleParams largeToLow, RumbleParams smallToHigh);
@@ -41,13 +44,13 @@ namespace ProconXInputTE
 		mutable std::mutex lastOutputMutex_;
 		mutable std::mutex lastOutputOutMutex_;
 
-		int largeMoterAmplification_{};
-		int smallMoterAmplification_{};
+		std::pair<int, int> largeMoterAmplification_{};
+		std::pair<int, int> smallMoterAmplification_{};
 		std::thread rumbleControlThread_{};
 		std::atomic_flag rumbleControlThreadRunning_{ ATOMIC_FLAG_INIT };
 
-		RumbleParams largeRumbleParam = { 0x80 , 16, 255 };
-		RumbleParams smallRumbleParam = { 0x40, 16, 255 };
+		RumbleParams largeRumbleParam = { { 130, 20, 216 }, { 142, 20, 216 }, };
+		RumbleParams smallRumbleParam = { { 72, 30, 176 }, { 100, 30, 176 } };
 
 	private:
 		void HandleControllerOutput(const ViGEm::X360OutputStatus& x360Output);
@@ -55,5 +58,4 @@ namespace ProconXInputTE
 		void RumbleControlTreadBody();
 		static int64_t GetCurrentTimestamp();
 	};
-
 }

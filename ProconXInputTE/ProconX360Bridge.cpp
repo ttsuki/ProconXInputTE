@@ -73,8 +73,6 @@ namespace ProconXInputTE
 
 	void ProconX360Bridge::HandleControllerOutput(const X360OutputStatus& x360Output)
 	{
-		largeMoterAmplification_ = std::max<int>(largeMoterAmplification_, x360Output.largeRumble);
-		smallMoterAmplification_ = std::max<int>(smallMoterAmplification_, x360Output.smallRumble);
 		{
 			std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
 			lastOutput_ = { GetCurrentTimestamp(), x360Output };
@@ -125,22 +123,35 @@ namespace ProconXInputTE
 		auto clock = std::chrono::steady_clock::now();
 		while (rumbleControlThreadRunning_.test_and_set())
 		{
-			largeMoterAmplification_ = std::max<int>(largeMoterAmplification_ - largeRumbleParam.DecaySpeed, 0);
-			smallMoterAmplification_ = std::max<int>(smallMoterAmplification_ - largeRumbleParam.DecaySpeed, 0);
+			largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first - largeRumbleParam.Left.DecaySpeed, 0);
+			smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first - smallRumbleParam.Left.DecaySpeed, 0);
+			largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second - largeRumbleParam.Right.DecaySpeed, 0);
+			smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second - smallRumbleParam.Right.DecaySpeed, 0);
+			{
+				std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
+				largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first, lastOutput_.second.largeRumble);
+				smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first, lastOutput_.second.smallRumble);
+				largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second, lastOutput_.second.largeRumble);
+				smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second, lastOutput_.second.smallRumble);
+			}
 
-			uint8_t large = largeMoterAmplification_ * largeRumbleParam.MaxAmplitude / 255;
-			uint8_t small = smallMoterAmplification_ * smallRumbleParam.MaxAmplitude / 255;
 			controller_->SetRumbleBasic(
-				large, large, small, small,
-				largeRumbleParam.Frequency,
-				largeRumbleParam.Frequency, 
-				smallRumbleParam.Frequency, 
-				smallRumbleParam.Frequency
+				largeMoterAmplification_.first * largeRumbleParam.Left.MaxAmplitude / 255,
+				largeMoterAmplification_.second * largeRumbleParam.Right.MaxAmplitude / 255,
+				smallMoterAmplification_.first * smallRumbleParam.Left.MaxAmplitude / 255,
+				smallMoterAmplification_.second * smallRumbleParam.Right.MaxAmplitude / 255,
+				largeRumbleParam.Left.Frequency,
+				largeRumbleParam.Right.Frequency,
+				smallRumbleParam.Left.Frequency,
+				smallRumbleParam.Right.Frequency
 			);
 
 			{
 				std::lock_guard<decltype(lastOutputOutMutex_)> lock(lastOutputOutMutex_);
-				lastOutputOut_ = { GetCurrentTimestamp(), {large, small, 0} };
+				lastOutputOut_ = { GetCurrentTimestamp(), {
+					static_cast<uint8_t>(largeMoterAmplification_.first), 
+					static_cast<uint8_t>(smallMoterAmplification_.first),
+					0 } };
 			}
 
 			clock += std::chrono::milliseconds(16);
