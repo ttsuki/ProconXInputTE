@@ -3,19 +3,18 @@
 #include <Windows.h>
 #include <conio.h>
 
-#include "ProconIO/HidDeviceCollection.h"
-#include "ProconIO/ProController.h"
-#include "ViGEmClient.h"
+#include "../ProControllerHid/ProController.h"
+#include "../ViGEmClient/ViGEmClientCpp.h"
 
 namespace ProconXInputTE
 {
-	constexpr unsigned short kNintendoVID{ 0x057E };
-	constexpr unsigned short kProControllerPID{ 0x2009 };
+	using namespace ProControllerHid;
+	using namespace ViGEm;
 
 	void RunProconTest()
 	{
 		std::unique_ptr<ProController> controller;
-		for (auto device : HidDeviceCollection::EnumerateDevices(kNintendoVID, kProControllerPID))
+		for (auto device : EnumerateProControllers())
 		{
 			std::cout << "Device found:" << std::endl;
 			std::cout << "  Path: " << device.path << std::endl;
@@ -24,7 +23,7 @@ namespace ProconXInputTE
 
 			std::wcout << L"  Opening device..." << std::endl;
 
-			controller = std::make_unique<ProController>(&device, 0, [&controller](const InputStatus& s)
+			controller = ProController::Connect(&device, 0, [&controller](const InputStatus& s)
 				{
 					const auto& lStick = s.LeftStick;
 					const auto& rStick = s.RightStick;
@@ -89,6 +88,7 @@ namespace ProconXInputTE
 							buttons.YButton << 3);
 					}
 				});
+			controller->StartStatusCallback();
 			break;
 		}
 
@@ -132,11 +132,12 @@ namespace ProconXInputTE
 		}
 
 	public:
-		ProConX360Bridge(hid_device_info* proCon, ViGEmClient* client)
+		ProConX360Bridge(hid_device_info* proCon, ::ViGEm::ViGEmClient* client)
 		{
 			x360_ = client->AddX360Controller([this](const X360OutputStatus& x360Output) { HandleControllerOutput(x360Output); });
-			controller_ = std::make_unique<ProController>(proCon, x360_->GetDeviceIndex(), [this](const InputStatus& proconInput) { HandleControllerInput(proconInput); });
+			controller_ = ProController::Connect(proCon, x360_->GetDeviceIndex(), [this](const InputStatus& proconInput) { HandleControllerInput(proconInput); });
 			x360_->StartNotification();
+			controller_->StartStatusCallback();
 			rumbleControlThreadRunning_.test_and_set();
 			rumbleControlThread_ = std::thread([this] { RumbleControlTreadBody(); });
 		}
@@ -146,6 +147,7 @@ namespace ProconXInputTE
 			rumbleControlThreadRunning_.clear();
 			rumbleControlThread_.join();
 			x360_->StopNotification();
+			controller_->StopStatusCallback();
 			controller_.reset();
 			x360_.reset();
 		}
@@ -180,6 +182,8 @@ namespace ProconXInputTE
 				clock += std::chrono::milliseconds(16);
 				std::this_thread::sleep_until(clock);
 			}
+
+			controller_->SetRumbleBasic(0, 0, 0, 0);
 		}
 
 		void HandleControllerInput(const InputStatus& inputStatus)
@@ -234,7 +238,7 @@ namespace ProconXInputTE
 
 		std::cout << "Finding Pro Controllers..." << std::endl;
 		std::vector<std::unique_ptr<ProConX360Bridge>> bridges;
-		for (auto device : HidDeviceCollection::EnumerateDevices(kNintendoVID, kProControllerPID))
+		for (auto device : EnumerateProControllers())
 		{
 			std::cout << "Device found:" << std::endl;
 			std::cout << "  Path: " << device.path << std::endl;

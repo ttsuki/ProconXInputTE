@@ -104,6 +104,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -120,6 +121,7 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -140,6 +142,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -160,34 +163,22 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>setupapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\ThirdParty\hidapi\windows\hid.c">
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <ForcedIncludeFiles />
-    </ClCompile>
-    <ClCompile Include="ProConIO\HidDevice.cpp" />
-    <ClCompile Include="ProConIO\HidDeviceCollection.cpp" />
-    <ClCompile Include="ProConIO\ProController.cpp" />
-    <ClCompile Include="ViGEmClient.cpp" />
     <ClCompile Include="ProconXInputTE.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\ThirdParty\hidapi\hidapi\hidapi.h" />
-    <ClInclude Include="ProConIO\HidDevice.h" />
-    <ClInclude Include="ProConIO\HidDeviceCollection.h" />
-    <ClInclude Include="ProConIO\ProController.h" />
-    <ClInclude Include="ViGEmClient.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\ThirdParty\hidapi\LICENSE-orig.txt" />
-  </ItemGroup>
-  <ItemGroup>
+    <ProjectReference Include="..\ProControllerHid\ProControllerHid.vcxproj">
+      <Project>{5b300b9a-dd6f-4e17-bf59-15db42e75933}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\ViGEmClient\ViGEmClient.vcxproj">
       <Project>{c9e05f13-0630-4a55-8450-7a3f64c892b2}</Project>
     </ProjectReference>
