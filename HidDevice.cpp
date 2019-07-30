@@ -1,6 +1,7 @@
 #include "HidDevice.h"
 #include "SysDep.h"
 
+#include <string>
 namespace ProControllerHid
 {
 	namespace HidIo
@@ -69,8 +70,9 @@ namespace ProControllerHid
 			if (!receiverThread_.joinable())
 			{
 				running_.test_and_set();
-				receiverThread_ = std::thread([this]
+				receiverThread_ = std::thread([this, path = std::string(path)]
 					{
+						SysDep::SetThreadName((std::string(path) + "-ReaderThread").c_str());
 						SysDep::SetThreadPriorityToRealtime();
 						while (running_.test_and_set())
 						{
