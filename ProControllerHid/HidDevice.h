@@ -5,6 +5,7 @@
 #include <thread>
 #include <functional>
 #include <atomic>
+#include <queue>
 
 #include <hidapi.h>
 
@@ -12,15 +13,17 @@ namespace ProControllerHid
 {
 	namespace HidIo
 	{
-		struct Buffer
+		class Buffer final
 		{
 			std::array<uint8_t, 1024> buffer_{};
 			size_t size_{};
 
+		public:
 			Buffer() = default;
 			Buffer(std::initializer_list<uint8_t> list);
 			Buffer(const Buffer& other) = default;
 			Buffer& operator=(const Buffer& other) = default;
+			~Buffer() = default;
 
 			uint8_t* data() noexcept { return buffer_.data(); }
 			const uint8_t* data() const noexcept { return buffer_.data(); }
@@ -32,7 +35,19 @@ namespace ProControllerHid
 			Buffer& operator +=(const Buffer& data);
 		};
 
-		class HidDevice
+		class BufferQueue final
+		{
+			std::mutex mutex_{};
+			std::queue<Buffer> queue_{};
+			std::condition_variable signal_{};
+
+		public:
+			void Signal(const Buffer& data);
+			Buffer Wait();
+			void Clear();
+		};
+
+		class HidDevice final
 		{
 			hid_device* dev_{};
 
@@ -40,39 +55,43 @@ namespace ProControllerHid
 			HidDevice() = default;
 			HidDevice(const HidDevice& other) = delete;
 			HidDevice& operator=(const HidDevice& other) = delete;
-			virtual ~HidDevice();
+			~HidDevice();
 
 			bool OpenDevice(const char* path);
 			void CloseDevice();
-
 			int SendPacket(const Buffer& data);
-			Buffer ReceivePacket(int millisec = 20);
+			Buffer ReceivePacket(int millisec = -1);
 		};
 
-		class HidDeviceThreaded
+		class HidDeviceThreaded final
 		{
-			HidDevice device_{};
-			std::thread receiverThread_{};
-			std::atomic_flag running_{ ATOMIC_FLAG_INIT };
-			std::function<void(const Buffer& data)> packetCallback_{};
-			std::mutex packetCallbackMutex_;
+			HidDevice deviceToSend_{};
+			HidDevice deviceToReceive_{};
 
+			BufferQueue senderQueue_{};
+			BufferQueue receiveQueue_{};
+			bool running_{};
+
+			std::thread senderThread_{};
+			std::atomic_flag senderThreadRunning_{ ATOMIC_FLAG_INIT };
+
+			std::thread receiverThread_{};
+			std::atomic_flag receiverThreadRunning_{ ATOMIC_FLAG_INIT };
+
+			std::thread dispatcherThread_{};
+			std::atomic_flag dispatcherThreadRunning_{ ATOMIC_FLAG_INIT };
+
+			std::function<void(const Buffer& data)> onPacket_{};
 		public:
 			HidDeviceThreaded() = default;
 			HidDeviceThreaded(const HidDeviceThreaded& other) = delete;
 			HidDeviceThreaded& operator=(const HidDeviceThreaded& other) = delete;
-			virtual ~HidDeviceThreaded();
+			~HidDeviceThreaded();
 
-			bool OpenDevice(const char* path);
+			bool OpenDevice(const char* path, std::function<void(const Buffer& data)> onPacket);
 			void CloseDevice();
 
 			int SendPacket(const Buffer& data);
-			void ExchangePacket(const Buffer& send, const std::function<bool(const Buffer& received)>& wait);
-
-			/// Please override me in derived class.
-			virtual void OnPacket(const Buffer&)
-			{
-			}
 		};
 	}
 }
