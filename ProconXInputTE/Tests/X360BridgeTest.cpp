@@ -29,7 +29,7 @@ namespace ProconXInputTE
 			using namespace ProControllerHid;
 			using namespace ViGEm;
 
-			ResizeConsole();
+			SetupConsoleWindow();
 
 			std::cout << "Starting ViGEm Client..." << std::endl;
 			auto client = ViGEmClient::Connect();

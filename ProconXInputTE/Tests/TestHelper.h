@@ -11,7 +11,7 @@ namespace ProconXInputTE
 			const ProControllerHid::InputStatus& input,
 			bool withClock, bool withRaw = false);
 
-		void ResizeConsole();
+		void SetupConsoleWindow();
 		void WaitEscapeOrCtrlC();
 	}
 }

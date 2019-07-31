@@ -17,7 +17,7 @@ namespace ProconXInputTE
 		void RunProconTest()
 		{
 			using namespace ProControllerHid;
-			ResizeConsole();
+			SetupConsoleWindow();
 
 			std::mutex console;
 			std::vector<std::unique_ptr<ProController>> controllers;
