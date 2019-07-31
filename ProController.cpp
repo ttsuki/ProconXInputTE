@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <thread>
 #include <chrono>
+#include <shared_mutex>
+#include <map>
 
 #include <hidapi.h>
 
@@ -31,24 +33,38 @@ namespace ProControllerHid
 #endif
 	}
 
-	class ProControllerImpl final : HidIo::HidDeviceThreaded, public ProController
+	class ProControllerImpl final : public ProController
 	{
+		HidIo::HidDeviceThreaded device_{};
+
 		uint8_t nextPacketNumber_{};
 		HidIo::Buffer rumbleStatus_{};
 		uint8_t playerLedStatus_{};
 
 		std::thread controllerUpdaterThread_{};
-		std::atomic_flag running_{ ATOMIC_FLAG_INIT };
+		std::atomic_flag controllerUpdaterThreadRunning_{ ATOMIC_FLAG_INIT };
 
 		std::function<void(const InputStatus& status)> statusCallback_{};
 		bool statusCallbackEnabled_{};
 		std::mutex statusCallbackCalling_{};
 
+		class PendingCommandMap
+		{
+			std::shared_mutex mutex_{};
+			std::condition_variable_any signal_{};
+			std::map<uint8_t, std::chrono::steady_clock::time_point> pending_{};
+		public:
+			void Register(uint8_t command, std::chrono::milliseconds timeout = std::chrono::milliseconds(60));
+			void Signal(uint8_t command);
+			bool Pending(uint8_t command);
+			bool Wait(uint8_t command);
+		} usbCommandQueue_{}, subCommandQueue_{};
+
 	public:
 		ProControllerImpl(const hid_device_info* devInfo, int index,
 			std::function<void(const InputStatus& status)> statusCallback);
 		~ProControllerImpl() override;
-		
+
 		void StartStatusCallback() override;
 		void StopStatusCallback() override;
 
@@ -63,17 +79,52 @@ namespace ProControllerHid
 		void SendSubCommand(uint8_t subCommand, const HidIo::Buffer& data, bool waitAck);
 		void SendRumble();
 
-		void OnPacket(const HidIo::Buffer& data) override;
+		void OnPacket(const HidIo::Buffer& data);
 		void OnStatus(const HidIo::Buffer& data);
 	};
+
+	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, std::chrono::milliseconds timeout)
+	{
+		std::lock_guard<decltype(mutex_)> lock(mutex_);
+		pending_[command] = std::chrono::steady_clock::now() + timeout;
+	}
+
+	void ProControllerImpl::PendingCommandMap::Signal(uint8_t command)
+	{
+		std::lock_guard<decltype(mutex_)> lock(mutex_);
+		pending_.erase(command);
+		signal_.notify_all();
+	}
+
+	bool ProControllerImpl::PendingCommandMap::Pending(uint8_t command)
+	{
+		std::shared_lock<decltype(mutex_)> lock(mutex_);
+		auto it = pending_.find(command);
+		return it != pending_.end() && it->second < std::chrono::steady_clock::now();
+	}
+
+	bool ProControllerImpl::PendingCommandMap::Wait(uint8_t command)
+	{
+		std::shared_lock<decltype(mutex_)> lock(mutex_);
+		auto it = pending_.find(command);
+		if (it == pending_.end())
+		{
+			return true;
+		}
+
+		return signal_.wait_until(lock, it->second,
+			[this, command] { return pending_.count(command) == 0; })
+			|| pending_.count(command) == 0;
+	}
 
 	ProControllerImpl::ProControllerImpl(const hid_device_info* devInfo, int index,
 		std::function<void(const InputStatus& status)> statusCallback)
 	{
-		rumbleStatus_ = { 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40 };
-		playerLedStatus_ = 0x3 | index << 2;
+		SetRumbleBasic(0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80);
+		SetPlayerLed((1 << index) - 1);
 
-		if (!OpenDevice(devInfo->path))
+		bool openResult = device_.OpenDevice(devInfo->path, [this](const Buffer& data) { OnPacket(data); });
+		if (!openResult)
 		{
 			return;
 		}
@@ -82,41 +133,46 @@ namespace ProControllerHid
 		SendUsbCommand(0x03, {}, true); // Set baudrate to 3Mbps
 		SendUsbCommand(0x02, {}, true); // Handshake
 		SendUsbCommand(0x04, {}, false); // HID only-mode(No use Bluetooth)
-		std::this_thread::sleep_for(std::chrono::milliseconds(16));
 
 		SendSubCommand(0x40, { 0x00 }, true); // disable imuData
 		SendSubCommand(0x48, { 0x01 }, true); // enable Rumble
 		SendSubCommand(0x38, { 0x2F, 0x10, 0x11, 0x33, 0x33 }, true); // Set HOME Light animation
 		SendSubCommand(0x30, { playerLedStatus_ }, true); // Set Player LED Status
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(16));
-
 		statusCallback_ = std::move(statusCallback);
-		running_.test_and_set();
-		controllerUpdaterThread_ = std::thread([this, path = std::string(devInfo->path)]
+
+		controllerUpdaterThreadRunning_.test_and_set();
+		controllerUpdaterThread_ = std::thread([this, threadName = std::string(devInfo->path) + "-UpdaterThread"]
 			{
+				SysDep::SetThreadName(threadName.c_str());
 				SysDep::SetThreadPriorityToRealtime();
-				SysDep::SetThreadName((std::string(path) + "-UpdaterThread").c_str());
-				decltype(playerLedStatus_) playerLedStatus = 0;
 				auto clock = std::chrono::steady_clock::now();
 
-				while (running_.test_and_set())
+				decltype(playerLedStatus_) playerLedStatus = playerLedStatus_;
+				decltype(playerLedStatus_) playerLedStatusSending = playerLedStatus_;
+				auto updatePlayerLedStatus = [&]
 				{
-					if (playerLedStatus != playerLedStatus_)
+					if (subCommandQueue_.Pending(0x30)) { return false; }
+					if (subCommandQueue_.Wait(0x30)) { playerLedStatus = playerLedStatusSending; }
+					if (playerLedStatusSending != playerLedStatus_ || playerLedStatus != playerLedStatus_)
 					{
-						playerLedStatus = playerLedStatus_;
-						SendSubCommand(0x30, { playerLedStatus }, false);
-						// TODO: build subcommand queue and retrying...?
+						playerLedStatusSending = playerLedStatus_;
+						SendSubCommand(0x30, { playerLedStatusSending }, false);
+						return true;
 					}
-					else
+					return false;
+				};
+
+				while (controllerUpdaterThreadRunning_.test_and_set())
+				{
+					if (updatePlayerLedStatus()) { }
+					else 
 					{
 						SendRumble();
 					}
-					clock = std::max(clock + std::chrono::milliseconds(16),
-						std::chrono::steady_clock::now() + std::chrono::milliseconds(8));
+					clock += std::chrono::nanoseconds(16666667);
 					std::this_thread::sleep_until(clock);
 				}
-				std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			}
 		);
 	}
@@ -125,14 +181,14 @@ namespace ProControllerHid
 	{
 		if (controllerUpdaterThread_.joinable())
 		{
-			running_.clear();
+			controllerUpdaterThreadRunning_.clear();
 			controllerUpdaterThread_.join();
 		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(120));
 		SendSubCommand(0x38, { 0x00 }, true); // Set HOME Light animation
 		SendSubCommand(0x30, { 0x00 }, true); // Set Player LED
 		SendUsbCommand(0x05, {}, false); // Allows the Joy-Con or Pro Controller to time out and talk Bluetooth again.
 		//ExecSubCommand(0x06, { 0x00 }, false); // Set HCI state (sleep mode)
+		device_.CloseDevice();
 	}
 
 	void ProControllerImpl::StartStatusCallback()
@@ -172,21 +228,15 @@ namespace ProControllerHid
 		buf += data;
 		DumpPacket("UsbCmd>", buf);
 
+		usbCommandQueue_.Register(usbCommand);
+		device_.SendPacket(buf);
 		if (waitAck)
 		{
-			ExchangePacket(buf, [&](const Buffer& r)
-				{
-					if (r[0] == 0x81 && r[1] == usbCommand)
-					{
-						DumpPacket("UsbAck<", r, 0, 2);
-						return true;
-					}
-					return false;
-				});
-		}
-		else
-		{
-			SendPacket(buf);
+			while (!usbCommandQueue_.Wait(usbCommand))
+			{
+				usbCommandQueue_.Register(usbCommand);
+				device_.SendPacket(buf);
+			}
 		}
 	}
 
@@ -201,21 +251,17 @@ namespace ProControllerHid
 		buf += {subCommand};
 		buf += data;
 		DumpPacket("SubCmd>", buf, 10);
+		
+		subCommandQueue_.Register(subCommand);
+		device_.SendPacket(buf);
+
 		if (waitAck)
 		{
-			ExchangePacket(buf, [&](const Buffer& r)
-				{
-					if (r[0] == 0x21 && r[14] == subCommand)
-					{
-						DumpPacket("SubAck<", r, 14, 8);
-						return true;
-					}
-					return false;
-				});
-		}
-		else
-		{
-			SendPacket(buf);
+			while (!subCommandQueue_.Wait(subCommand))
+			{
+				subCommandQueue_.Register(subCommand);
+				device_.SendPacket(buf);
+			}
 		}
 	}
 
@@ -227,7 +273,7 @@ namespace ProControllerHid
 			rumbleStatus_[0], rumbleStatus_[1], rumbleStatus_[2], rumbleStatus_[3],
 			rumbleStatus_[4], rumbleStatus_[5], rumbleStatus_[6], rumbleStatus_[7],
 		};
-		SendPacket(buf);
+		device_.SendPacket(buf);
 	}
 
 	void ProControllerImpl::OnPacket(const Buffer& data)
@@ -236,11 +282,20 @@ namespace ProControllerHid
 		{
 			switch (data[0])
 			{
-			case 0x21: // Reply to sub command.
 			case 0x30: // Input status full
 			case 0x31: // Input status full
 				OnStatus(data);
 				break;
+
+			case 0x21: // Reply to sub command.
+				subCommandQueue_.Signal(data[14]);
+				OnStatus(data);
+				break;
+
+			case 0x81: // Reply to usb command.
+				usbCommandQueue_.Signal(data[1]);
+				break;
+
 			default:
 				DumpPacket("Packet<", data, 0, 16);
 				break;

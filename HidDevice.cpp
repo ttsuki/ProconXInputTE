@@ -2,6 +2,7 @@
 #include "SysDep.h"
 
 #include <string>
+
 namespace ProControllerHid
 {
 	namespace HidIo
@@ -20,6 +21,31 @@ namespace ProControllerHid
 			}
 			size_ += data.size();
 			return *this;
+		}
+
+		void BufferQueue::Signal(const Buffer& data)
+		{
+			std::lock_guard<decltype(mutex_)> lock(mutex_);
+			if (queue_.size() < 16)
+			{
+				queue_.push(data);
+				signal_.notify_one();
+			}
+		}
+
+		Buffer BufferQueue::Wait()
+		{
+			std::unique_lock<decltype(mutex_)> lock(mutex_);
+			signal_.wait(lock, [this] { return !queue_.empty(); });
+			Buffer data = queue_.front();
+			queue_.pop();
+			return data;
+		}
+
+		void BufferQueue::Clear()
+		{
+			std::lock_guard<decltype(mutex_)> lock(mutex_);
+			while (!queue_.empty()) { queue_.pop(); }
 		}
 
 		HidDevice::~HidDevice()
@@ -57,77 +83,120 @@ namespace ProControllerHid
 
 		HidDeviceThreaded::~HidDeviceThreaded()
 		{
-			HidDeviceThreaded::CloseDevice();
+			CloseDevice();
 		}
 
-		bool HidDeviceThreaded::OpenDevice(const char* path)
+		bool HidDeviceThreaded::OpenDevice(const char* path, std::function<void(const Buffer& data)> onPacket)
 		{
-			if (!device_.OpenDevice(path))
+			CloseDevice();
+
+			if (!deviceToSend_.OpenDevice(path))
 			{
 				return false;
 			}
 
-			if (!receiverThread_.joinable())
+			if (!deviceToReceive_.OpenDevice(path))
 			{
-				running_.test_and_set();
-				receiverThread_ = std::thread([this, path = std::string(path)]
+				deviceToSend_.CloseDevice();
+				return false;
+			}
+
+			onPacket_ = std::move(onPacket);
+
+			senderQueue_.Clear();
+			receiveQueue_.Clear();
+
+			senderThreadRunning_.test_and_set();
+			senderThread_ = std::thread([this, threadName = std::string(path) + "-SenderThread"]
+				{
+					SysDep::SetThreadName(threadName.c_str());
+					SysDep::SetThreadPriorityToRealtime();
+					while (true)
 					{
-						SysDep::SetThreadName((std::string(path) + "-ReaderThread").c_str());
-						SysDep::SetThreadPriorityToRealtime();
-						while (running_.test_and_set())
+						Buffer data = senderQueue_.Wait();
+						if (!senderThreadRunning_.test_and_set()) { break; }
+						if (data.size())
 						{
-							Buffer data = device_.ReceivePacket(10);
-							if (!data.size()) { continue; }
-							OnPacket(data);
+							if (deviceToSend_.SendPacket(data) < 0)
 							{
-								std::lock_guard<decltype(packetCallbackMutex_)> lock(packetCallbackMutex_);
-								if (packetCallback_)
-								{
-									packetCallback_(data);
-								}
+								// failed.
 							}
 						}
 					}
-				);
-			}
-			return true;
+				});
+
+			receiverThreadRunning_.test_and_set();
+			receiverThread_ = std::thread([this, threadName = std::string(path) + "-ReceiverThread"]
+				{
+					SysDep::SetThreadName(threadName.c_str());
+					SysDep::SetThreadPriorityToRealtime();
+					while (receiverThreadRunning_.test_and_set())
+					{
+						Buffer data;
+						{
+							while (true)
+							{
+								data = deviceToReceive_.ReceivePacket(100);
+								if (data.size()) { break; }
+							}
+						}
+						receiveQueue_.Signal(data);
+					}
+				});
+
+			dispatcherThreadRunning_.test_and_set();
+			dispatcherThread_ = std::thread([this, threadName = std::string(path) + "-DispatcherThread"]
+				{
+					SysDep::SetThreadName(threadName.c_str());
+					SysDep::SetThreadPriorityToRealtime();
+					while (true)
+					{
+						Buffer data = receiveQueue_.Wait();
+						if (!dispatcherThreadRunning_.test_and_set()) { break; }
+						onPacket_(data);
+					}
+				});
+
+			return running_ = true;
 		}
 
 		void HidDeviceThreaded::CloseDevice()
 		{
+			running_ = false;
+
+			senderThreadRunning_.clear();
+			if (senderThread_.joinable())
+			{
+				senderQueue_.Signal({});
+				senderThread_.join();
+			}
+
+			receiverThreadRunning_.clear();
 			if (receiverThread_.joinable())
 			{
-				running_.clear();
 				receiverThread_.join();
 			}
-			packetCallback_ = nullptr;
-			device_.CloseDevice();
+
+			dispatcherThreadRunning_.clear();
+			if (dispatcherThread_.joinable())
+			{
+				receiveQueue_.Signal({});
+				dispatcherThread_.join();
+			}
+
+			deviceToReceive_.CloseDevice();
+			deviceToSend_.CloseDevice();
+
+			onPacket_ = nullptr;
 		}
 
 		int HidDeviceThreaded::SendPacket(const Buffer& data)
 		{
-			return device_.SendPacket(data);
+			if (!running_) { return 0; }
+		
+			senderQueue_.Signal(data);
+			return data.size();
 		}
 
-		void HidDeviceThreaded::ExchangePacket(const Buffer& send, const std::function<bool(const Buffer& received)>& wait)
-		{
-			std::atomic_flag goNext{ ATOMIC_FLAG_INIT };
-			goNext.test_and_set();
-			{
-				std::lock_guard<decltype(packetCallbackMutex_)> lock(packetCallbackMutex_);
-				packetCallback_ = [&](const Buffer& data) { if (wait(data)) { goNext.clear(); } };
-			}
-
-			SendPacket(send);
-			while (goNext.test_and_set())
-			{
-				std::this_thread::yield();
-			}
-
-			{
-				std::lock_guard<decltype(packetCallbackMutex_)> lock(packetCallbackMutex_);
-				packetCallback_ = nullptr;
-			}
-		}
 	}
 }

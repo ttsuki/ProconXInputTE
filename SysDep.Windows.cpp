@@ -11,7 +11,7 @@ namespace ProControllerHid
 	{
 		void SetThreadPriorityToRealtime()
 		{
-			::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+			::SetThreadPriority(::GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
 		}
 
 		void SetThreadName(const char* threadName)
