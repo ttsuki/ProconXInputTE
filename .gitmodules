@@ -3,4 +3,4 @@
 	url = https://github.com/signal11/hidapi.git
 [submodule "ThirdParty/ViGEmClient"]
 	path = ThirdParty/ViGEmClient
-	url = https://github.com/ViGEm/ViGEmClient
+	url = https://github.com/ttsuki/ViGEmClient
