@@ -1,6 +1,6 @@
 # ProconXInputTE
 
-I wanted to play [TETRIS EFFECT](http://www.tetriseffect.game/) with Nintendo Switch Pro controller with vibration!!!
+I wanted to play [TETRIS EFFECT](http://www.tetriseffect.game/) with Nintendo Switch Pro controller :video_game: with vibration!!!
 
 ---
 
@@ -14,12 +14,17 @@ An XInput user-mode driver for Nintendo Switch Pro Controller (USB-wired mode) u
 - XInput support with ViGEm.
 - Vibration support.
 
+## Download
+
+See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
+
 ## How to use
 
  0. Install [ViGEm Bus Driver](https://github.com/ViGEm/ViGEmBus/releases).
  1. Connect your Nintendo Switch Pro Controller with USB cable to PC.
- 2. Start the driver application.
+ 2. Start the driver application [ProconXInputTE_x86.exe](https://github.com/ttsuki/ProconXInputTE/releases/latest).
  3. Play your favorite game :blush:
+
 
 ---
 
