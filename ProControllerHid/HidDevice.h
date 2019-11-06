@@ -7,8 +7,6 @@
 #include <atomic>
 #include <queue>
 
-#include <hidapi.h>
-
 namespace ProControllerHid
 {
 	namespace HidIo
@@ -49,7 +47,7 @@ namespace ProControllerHid
 
 		class HidDevice final
 		{
-			hid_device *dev_{};
+			void *dev_{};
 
 		public:
 			HidDevice() = default;
@@ -93,5 +91,17 @@ namespace ProControllerHid
 
 			int SendPacket(const Buffer &data);
 		};
+
+		struct HidDeviceInfo
+		{
+			std::string devicePath;
+			std::wstring manufactureName;
+			std::wstring productName;
+			std::wstring serialNumber;
+		};
+
+		using HidDeviceList = std::vector<HidDeviceInfo>;
+
+		HidDeviceList EnumerateConnectedDevices(unsigned short vendorId, unsigned short productId);
 	}
 }

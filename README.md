@@ -35,7 +35,6 @@ See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
  - ViGEm Bus Driver: [https://github.com/ViGEm/ViGEmBus](https://github.com/ViGEm/ViGEmBus/)
 
 ## Third-party library / submodules
- - HIDAPI: https://github.com/signal11/hidapi
  - ViGEm Client: https://github.com/ViGEm/ViGEmClient
    - Boost.Asio (from NuGet package 1.70 *-src)
 

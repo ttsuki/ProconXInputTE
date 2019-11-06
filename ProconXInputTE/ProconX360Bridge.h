@@ -8,11 +8,11 @@
 
 namespace ProconXInputTE
 {
-	class ProconX360Bridge
+	class ProconX360Bridge final
 	{
 	public:
 
-		ProconX360Bridge(hid_device_info *proCon, ::ViGEm::ViGEmClient *client);
+		ProconX360Bridge(const char *proConDevicePath, ::ViGEm::ViGEmClient *client);
 		~ProconX360Bridge();
 
 		struct RumbleParams

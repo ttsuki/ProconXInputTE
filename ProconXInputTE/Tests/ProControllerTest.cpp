@@ -4,7 +4,6 @@
 #include <mutex>
 #include <iostream>
 
-#include <hidapi.h>
 #include <ProControllerHid/ProController.h>
 
 #include "TestHelper.h"
@@ -22,12 +21,12 @@ namespace ProconXInputTE
 			std::vector<std::unique_ptr<ProController>> controllers;
 			int index = 0;
 
-			for (auto device : EnumerateProControllers())
+			for (const auto &devPath : ProController::EnumerateProControllerDevicePaths())
 			{
 				std::cout << "Device found:" << std::endl;
-				std::cout << "  Path: " << device.path << std::endl;
-				std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
-				std::wcout << L"  Product: " << device.product_string << std::endl;
+				std::cout << "  Path: " << devPath << std::endl;
+				//std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
+				//std::wcout << L"  Product: " << device.product_string << std::endl;
 
 				std::wcout << L"  Opening device..." << std::endl;
 				auto callback = [&controllers, index, &console](const InputStatus &s)
@@ -75,7 +74,7 @@ namespace ProconXInputTE
 						s.Buttons.YButton << 3);
 				};
 
-				controllers.emplace_back(ProController::Connect(&device, index + 1, callback));
+				controllers.emplace_back(ProController::Connect(devPath.c_str(), index + 1, callback));
 				index++;
 			}
 

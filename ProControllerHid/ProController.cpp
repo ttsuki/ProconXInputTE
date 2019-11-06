@@ -6,8 +6,6 @@
 #include <shared_mutex>
 #include <map>
 
-#include <hidapi.h>
-
 #include "HidDevice.h"
 #include "SysDep.h"
 
@@ -61,7 +59,7 @@ namespace ProControllerHid
 		} usbCommandQueue_{}, subCommandQueue_{};
 
 	public:
-		ProControllerImpl(const hid_device_info *devInfo, int index,
+		ProControllerImpl(const char *pathToDevice, int index,
 			std::function<void(const InputStatus &status)> statusCallback);
 		~ProControllerImpl() override;
 
@@ -117,13 +115,14 @@ namespace ProControllerHid
 			|| pending_.count(command) == 0;
 	}
 
-	ProControllerImpl::ProControllerImpl(const hid_device_info *devInfo, int index,
+	ProControllerImpl::ProControllerImpl(
+		const char *pathToDevice, int index,
 		std::function<void(const InputStatus &status)> statusCallback)
 	{
 		SetRumbleBasic(0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80);
 		SetPlayerLed((1 << index) - 1);
 
-		bool openResult = device_.OpenDevice(devInfo->path, [this](const Buffer &data) { OnPacket(data); });
+		bool openResult = device_.OpenDevice(pathToDevice, [this](const Buffer &data) { OnPacket(data); });
 		if (!openResult)
 		{
 			return;
@@ -142,7 +141,7 @@ namespace ProControllerHid
 		statusCallback_ = std::move(statusCallback);
 
 		controllerUpdaterThreadRunning_.test_and_set();
-		controllerUpdaterThread_ = std::thread([this, threadName = std::string(devInfo->path) + "-UpdaterThread"]
+		controllerUpdaterThread_ = std::thread([this, threadName = std::string(pathToDevice) + "-UpdaterThread"]
 			{
 				SysDep::SetThreadName(threadName.c_str());
 				SysDep::SetThreadPriorityToRealtime();
@@ -338,16 +337,22 @@ namespace ProControllerHid
 		}
 	}
 
-	std::unique_ptr<ProController> ProController::Connect(const hid_device_info *devInfo, int index,
+	std::unique_ptr<ProController> ProController::Connect(
+		const char *pathToDevice, int index,
 		std::function<void(const InputStatus &status)> statusCallback)
 	{
-		return std::make_unique<ProControllerImpl>(devInfo, index, statusCallback);
+		return std::make_unique<ProControllerImpl>(pathToDevice, index, statusCallback);
 	}
 
-	HidDeviceCollection EnumerateProControllers()
+	std::vector<std::string> ProController::EnumerateProControllerDevicePaths()
 	{
+		std::vector<std::string> result;
 		constexpr unsigned short kNintendoVID{0x057E};
 		constexpr unsigned short kProControllerPID{0x2009};
-		return HidDeviceCollection::EnumerateDevices(kNintendoVID, kProControllerPID);
+		for (auto &&d : HidIo::EnumerateConnectedDevices(kNintendoVID, kProControllerPID))
+		{
+			result.push_back(d.devicePath);
+		}
+		return result;
 	}
 }
