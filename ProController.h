@@ -5,8 +5,6 @@
 
 #include "HidDeviceCollection.h"
 
-struct hid_device_info;
-
 namespace ProControllerHid
 {
 	class ControllerDevice
@@ -82,7 +80,8 @@ namespace ProControllerHid
 
 		virtual void SetPlayerLed(uint8_t playerLed) = 0;
 
-		static std::unique_ptr<ProController> Connect(const hid_device_info *devInfo, int index,
+		static std::unique_ptr<ProController> Connect(
+			const char *pathToDevice, int index,
 			std::function<void(const InputStatus &status)> statusCallback);
 	};
 
