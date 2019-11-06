@@ -12,7 +12,6 @@
 
 #include <Windows.h>
 
-#include <hidapi.h>
 #include <ProControllerHid/ProController.h>
 #include <ViGEmClient/ViGEmClientCpp.h>
 

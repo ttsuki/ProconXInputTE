@@ -4,7 +4,6 @@
 #include <mutex>
 #include <iostream>
 
-#include <hidapi.h>
 #include <ProControllerHid/ProController.h>
 
 #include "TestHelper.h"
