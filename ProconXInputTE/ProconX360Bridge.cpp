@@ -1,6 +1,5 @@
 #include "ProconX360Bridge.h"
 #include <algorithm>
-#include <hidapi.h>
 #include "ProControllerHid/SysDep.h"
 
 namespace ProconXInputTE
@@ -11,7 +10,7 @@ namespace ProconXInputTE
 	using ViGEm::X360InputStatus;
 	using ViGEm::X360OutputStatus;
 
-	ProconX360Bridge::ProconX360Bridge(hid_device_info *proCon, ::ViGEm::ViGEmClient *client)
+	ProconX360Bridge::ProconX360Bridge(const char *proConDevicePath, ::ViGEm::ViGEmClient *client)
 	{
 		x360_ = client->AddX360Controller(
 			[this](const X360OutputStatus &x360Output)
@@ -19,14 +18,14 @@ namespace ProconXInputTE
 				HandleControllerOutput(x360Output);
 			});
 
-		controller_ = ProController::Connect(proCon, x360_->GetDeviceIndex(),
+		controller_ = ProController::Connect(proConDevicePath, x360_->GetDeviceIndex(),
 			[this](const InputStatus &proconInput)
 			{
 				HandleControllerInput(proconInput);
 			});
 
 		rumbleControlThreadRunning_.test_and_set();
-		rumbleControlThread_ = std::thread([this, path = std::string(proCon->path)]
+		rumbleControlThread_ = std::thread([this, path = std::string(proConDevicePath)]
 		{
 			ProControllerHid::SysDep::SetThreadName((std::string(path) + "-BridgeThread").c_str());
 			RumbleControlTreadBody();

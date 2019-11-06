@@ -75,7 +75,7 @@ namespace ProconXInputTE
 						s.Buttons.YButton << 3);
 				};
 
-				controllers.emplace_back(ProController::Connect(&device, index + 1, callback));
+				controllers.emplace_back(ProController::Connect(device.path, index + 1, callback));
 				index++;
 			}
 

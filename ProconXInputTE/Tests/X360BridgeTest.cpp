@@ -51,7 +51,7 @@ namespace ProconXInputTE
 				std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
 				std::wcout << L"  Product: " << device.product_string << std::endl;
 
-				bridges.emplace_back(std::make_unique<ProconX360Bridge>(&device, client.get()));
+				bridges.emplace_back(std::make_unique<ProconX360Bridge>(device.path, client.get()));
 				std::cout << "  Connected as Virtual X360 Controller"
 					<< " index[" << bridges.back()->GetIndex() << "]"
 					<< std::endl;
