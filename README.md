@@ -36,7 +36,6 @@ See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
 
 ## Third-party library / submodules
  - ViGEm Client: https://github.com/ViGEm/ViGEmClient
-   - Boost.Asio (from NuGet package 1.70 *-src)
 
 ## Thanks to
  - Reverse Engineering Note: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering
