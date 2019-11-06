@@ -2,13 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="ViGEmClientCpp.cpp" />
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.cpp">
-      <Filter>ViGEmClient</Filter>
-    </ClCompile>
     <ClCompile Include="..\ThirdParty\ViGEmClient\src\ViGEmClient.cpp">
-      <Filter>ViGEmClient</Filter>
-    </ClCompile>
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.cpp">
       <Filter>ViGEmClient</Filter>
     </ClCompile>
   </ItemGroup>
@@ -20,9 +14,6 @@
     <ClInclude Include="..\ThirdParty\ViGEmClient\src\Internal.h">
       <Filter>ViGEmClient</Filter>
     </ClInclude>
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.h">
-      <Filter>ViGEmClient</Filter>
-    </ClInclude>
     <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\Client.h">
       <Filter>ViGEmClient\ViGEm</Filter>
     </ClInclude>
@@ -31,9 +22,6 @@
     </ClInclude>
     <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\Util.h">
       <Filter>ViGEmClient\ViGEm</Filter>
-    </ClInclude>
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.h">
-      <Filter>ViGEmClient</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

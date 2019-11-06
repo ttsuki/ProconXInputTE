@@ -155,23 +155,14 @@
     <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\Util.h" />
     <ClInclude Include="..\ThirdParty\ViGEmClient\include\ViGEm\km\BusShared.h" />
     <ClInclude Include="..\ThirdParty\ViGEmClient\src\Internal.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.h" />
-    <ClInclude Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.h" />
     <ClInclude Include="ViGEmClientCpp.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\NotificationRequestPool.cpp" />
     <ClCompile Include="..\ThirdParty\ViGEmClient\src\ViGEmClient.cpp" />
-    <ClCompile Include="..\ThirdParty\ViGEmClient\src\XusbNotificationRequest.cpp" />
     <ClCompile Include="ViGEmClientCpp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\boost-min\boost.vcxproj">
-      <Project>{ef7b5ebd-2a9c-4d22-ba4a-bcdbf31d5a75}</Project>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
