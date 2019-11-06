@@ -55,19 +55,27 @@ namespace ProControllerHid
 
 		bool HidDevice::OpenDevice(const char *path)
 		{
-			dev_ = hid_open_path(path);
+			dev_ = SysDep::HidDevice::OpenHidDevice(path);
 			return dev_;
 		}
 
 		void HidDevice::CloseDevice()
 		{
-			hid_close(dev_);
+			if (dev_)
+			{
+				static_cast<SysDep::HidDevice*>(dev_)->Close();
+				dev_ = nullptr;
+			}
 			dev_ = nullptr;
 		}
 
 		int HidDevice::SendPacket(const Buffer &data)
 		{
-			return hid_write(dev_, data.data(), data.size());
+			if (dev_)
+			{
+				return static_cast<SysDep::HidDevice*>(dev_)->SendPacket(data.data(), data.size());
+			}
+			return 0;
 		}
 
 		Buffer HidDevice::ReceivePacket(int millisec)
@@ -75,7 +83,7 @@ namespace ProControllerHid
 			Buffer buffer;
 			if (dev_)
 			{
-				int sz = hid_read_timeout(dev_, buffer.data(), buffer.capacity(), millisec);
+				int sz = static_cast<SysDep::HidDevice*>(dev_)->ReceivePacket(buffer.data(), buffer.capacity(), millisec);
 				buffer.resize(std::max<int>(sz, 0));
 			}
 			return buffer;
@@ -196,6 +204,22 @@ namespace ProControllerHid
 
 			senderQueue_.Signal(data);
 			return data.size();
+		}
+
+		HidDeviceList EnumerateConnectedDevices(unsigned short vendorId, unsigned short productId)
+		{
+			const auto devices = SysDep::EnumerateAllConnectedHidDevicePaths(vendorId, productId);
+			HidDeviceList result;
+			for (auto&& dev : devices)
+			{
+				HidDeviceInfo device{};
+				device.devicePath = dev.devicePath;
+				device.manufactureName = dev.manufactureName;
+				device.productName = dev.productName;
+				device.serialNumber = dev.serialNumber;
+				result.push_back(device);
+			}
+			return result;
 		}
 	}
 }

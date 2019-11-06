@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <memory>
 #include <functional>
-
-#include "HidDeviceCollection.h"
+#include <vector>
+#include <string>
 
 namespace ProControllerHid
 {
@@ -83,7 +83,7 @@ namespace ProControllerHid
 		static std::unique_ptr<ProController> Connect(
 			const char *pathToDevice, int index,
 			std::function<void(const InputStatus &status)> statusCallback);
-	};
 
-	HidDeviceCollection EnumerateProControllers();
+		static std::vector<std::string> EnumerateProControllerDevicePaths();
+	};
 }

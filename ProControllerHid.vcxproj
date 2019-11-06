@@ -20,13 +20,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="HidDevice.cpp" />
-    <ClCompile Include="HidDeviceCollection.cpp" />
     <ClCompile Include="ProController.cpp" />
     <ClCompile Include="SysDep.Windows.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HidDevice.h" />
-    <ClInclude Include="HidDeviceCollection.h" />
     <ClInclude Include="ProController.h" />
     <ClInclude Include="SysDep.h" />
   </ItemGroup>
