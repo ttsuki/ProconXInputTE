@@ -21,8 +21,8 @@ namespace ProControllerHid
 		public:
 			Buffer() = default;
 			Buffer(std::initializer_list<uint8_t> list);
-			Buffer(const Buffer& other) = default;
-			Buffer& operator=(const Buffer& other) = default;
+			Buffer(const Buffer &other) = default;
+			Buffer& operator=(const Buffer &other) = default;
 			~Buffer() = default;
 
 			uint8_t* data() noexcept { return buffer_.data(); }
@@ -32,7 +32,7 @@ namespace ProControllerHid
 			void resize(size_t sz) noexcept { size_ = sz; }
 			uint8_t& operator [](size_t index) { return buffer_[index]; }
 			const uint8_t& operator [](size_t index) const { return buffer_[index]; }
-			Buffer& operator +=(const Buffer& data);
+			Buffer& operator +=(const Buffer &data);
 		};
 
 		class BufferQueue final
@@ -42,24 +42,24 @@ namespace ProControllerHid
 			std::condition_variable signal_{};
 
 		public:
-			void Signal(const Buffer& data);
+			void Signal(const Buffer &data);
 			Buffer Wait();
 			void Clear();
 		};
 
 		class HidDevice final
 		{
-			hid_device* dev_{};
+			hid_device *dev_{};
 
 		public:
 			HidDevice() = default;
-			HidDevice(const HidDevice& other) = delete;
-			HidDevice& operator=(const HidDevice& other) = delete;
+			HidDevice(const HidDevice &other) = delete;
+			HidDevice& operator=(const HidDevice &other) = delete;
 			~HidDevice();
 
-			bool OpenDevice(const char* path);
+			bool OpenDevice(const char *path);
 			void CloseDevice();
-			int SendPacket(const Buffer& data);
+			int SendPacket(const Buffer &data);
 			Buffer ReceivePacket(int millisec = -1);
 		};
 
@@ -73,25 +73,25 @@ namespace ProControllerHid
 			bool running_{};
 
 			std::thread senderThread_{};
-			std::atomic_flag senderThreadRunning_{ ATOMIC_FLAG_INIT };
+			std::atomic_flag senderThreadRunning_{ATOMIC_FLAG_INIT};
 
 			std::thread receiverThread_{};
-			std::atomic_flag receiverThreadRunning_{ ATOMIC_FLAG_INIT };
+			std::atomic_flag receiverThreadRunning_{ATOMIC_FLAG_INIT};
 
 			std::thread dispatcherThread_{};
-			std::atomic_flag dispatcherThreadRunning_{ ATOMIC_FLAG_INIT };
+			std::atomic_flag dispatcherThreadRunning_{ATOMIC_FLAG_INIT};
 
-			std::function<void(const Buffer& data)> onPacket_{};
+			std::function<void(const Buffer &data)> onPacket_{};
 		public:
 			HidDeviceThreaded() = default;
-			HidDeviceThreaded(const HidDeviceThreaded& other) = delete;
-			HidDeviceThreaded& operator=(const HidDeviceThreaded& other) = delete;
+			HidDeviceThreaded(const HidDeviceThreaded &other) = delete;
+			HidDeviceThreaded& operator=(const HidDeviceThreaded &other) = delete;
 			~HidDeviceThreaded();
 
-			bool OpenDevice(const char* path, std::function<void(const Buffer& data)> onPacket);
+			bool OpenDevice(const char *path, std::function<void(const Buffer &data)> onPacket);
 			void CloseDevice();
 
-			int SendPacket(const Buffer& data);
+			int SendPacket(const Buffer &data);
 		};
 	}
 }

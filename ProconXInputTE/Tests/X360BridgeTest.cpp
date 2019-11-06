@@ -68,16 +68,17 @@ namespace ProconXInputTE
 
 			// monitor
 			{
-				std::atomic_flag monitorThreadRunning{ ATOMIC_FLAG_INIT };
+				std::atomic_flag monitorThreadRunning{ATOMIC_FLAG_INIT};
 				monitorThreadRunning.test_and_set();
 
 				std::mutex console;
-				auto monitorThread = std::thread([&]() {
+				auto monitorThread = std::thread([&]()
+				{
 					SetThreadDescription(GetCurrentThread(), L"MonitorThread");
 					while (monitorThreadRunning.test_and_set())
 					{
 						std::stringstream message;
-						for (auto&& b : bridges)
+						for (auto &&b : bridges)
 						{
 							auto input = b->GetLastInput().second;
 							auto outputIn = b->GetLastOutputIn().second;
@@ -89,13 +90,13 @@ namespace ProconXInputTE
 								<< std::setw(3) << static_cast<int>(outputOut.largeRumble) << "/"
 								<< std::setw(3) << static_cast<int>(outputIn.largeRumble);
 							message << " H:"
-								<< std::setw(3) << static_cast<int>(outputOut.smallRumble) << "/" 
+								<< std::setw(3) << static_cast<int>(outputOut.smallRumble) << "/"
 								<< std::setw(3) << static_cast<int>(outputIn.smallRumble);
 							message << "  In " << StatusString(input, false, false);
 							message << "\n";
 						}
 
-						for (auto&& b : bridges)
+						for (auto &&b : bridges)
 						{
 							message << "\x1b[1A";
 						}
@@ -103,7 +104,7 @@ namespace ProconXInputTE
 						std::cout << s << std::flush;
 						std::this_thread::sleep_for(std::chrono::milliseconds(20));
 					}
-					});
+				});
 				WaitEscapeOrCtrlC();
 
 				monitorThreadRunning.clear();

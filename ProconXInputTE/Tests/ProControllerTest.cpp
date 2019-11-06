@@ -1,4 +1,3 @@
-
 #include <memory>
 #include <vector>
 #include <string>
@@ -31,9 +30,9 @@ namespace ProconXInputTE
 				std::wcout << L"  Product: " << device.product_string << std::endl;
 
 				std::wcout << L"  Opening device..." << std::endl;
-				auto callback = [&controllers, index, &console](const InputStatus& s)
+				auto callback = [&controllers, index, &console](const InputStatus &s)
 				{
-					auto& controller = controllers[index];
+					auto &controller = controllers[index];
 
 					// Rumble output
 					int lf = s.LeftStick.AxisX >> 4;
@@ -88,12 +87,12 @@ namespace ProconXInputTE
 
 			std::cout << std::endl;
 			std::cout << "Controller started." << std::endl;
-			for (auto&& controller : controllers)
+			for (auto &&controller : controllers)
 			{
 				controller->StartStatusCallback();
 			}
 			WaitEscapeOrCtrlC();
-			for (auto&& controller : controllers)
+			for (auto &&controller : controllers)
 			{
 				controller->StopStatusCallback();
 			}

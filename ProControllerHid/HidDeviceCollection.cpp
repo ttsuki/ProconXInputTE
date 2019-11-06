@@ -22,16 +22,16 @@ namespace ProControllerHid
 	HidDeviceCollection::const_iterator HidDeviceCollection::const_iterator::operator++(int)
 	{
 		auto i = *this;
-		++* this;
+		++*this;
 		return i;
 	}
 
-	bool HidDeviceCollection::const_iterator::operator==(const const_iterator& rhs) const
+	bool HidDeviceCollection::const_iterator::operator==(const const_iterator &rhs) const
 	{
 		return ptr_ == rhs.ptr_;
 	}
 
-	bool HidDeviceCollection::const_iterator::operator!=(const const_iterator& rhs) const
+	bool HidDeviceCollection::const_iterator::operator!=(const const_iterator &rhs) const
 	{
 		return !(*this == rhs);
 	}
@@ -46,13 +46,13 @@ namespace ProControllerHid
 		hid_free_enumeration(devs_);
 	}
 
-	HidDeviceCollection::HidDeviceCollection(HidDeviceCollection&& other) noexcept
+	HidDeviceCollection::HidDeviceCollection(HidDeviceCollection &&other) noexcept
 		: devs_(other.devs_)
 	{
 		other.devs_ = nullptr;
 	}
 
-	HidDeviceCollection& HidDeviceCollection::operator=(HidDeviceCollection&& other) noexcept
+	HidDeviceCollection& HidDeviceCollection::operator=(HidDeviceCollection &&other) noexcept
 	{
 		if (this == &other) { return *this; }
 		devs_ = other.devs_;
@@ -72,6 +72,6 @@ namespace ProControllerHid
 
 	HidDeviceCollection HidDeviceCollection::EnumerateDevices(unsigned short vendorId, unsigned short productId)
 	{
-		return HidDeviceCollection{ vendorId, productId };
+		return HidDeviceCollection{vendorId, productId};
 	}
 }

@@ -12,19 +12,19 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		template <class T, std::enable_if_t<std::is_trivially_copyable_v<T>, int> = 0>
+		template <class T, std::enable_if_t<std::is_trivially_copyable_v<T>, int>  = 0>
 		inline static int AsRaw32bit(T t)
 		{
 			union
 			{
 				T t_;
 				int i_;
-			} x{ t };
+			} x{t};
 			return x.i_;
 		}
 
 		std::string StatusString(
-			const ProControllerHid::InputStatus& input,
+			const ProControllerHid::InputStatus &input,
 			bool withClock, bool withRaw)
 		{
 			char clockStr[32];
@@ -81,11 +81,11 @@ namespace ProconXInputTE
 		{
 			DWORD mode = {};
 			GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &mode);
- 			SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+			SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 
 			CONSOLE_SCREEN_BUFFER_INFO info;
 			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info);
-			info.dwSize.X = std::max(info.dwSize.X, SHORT{ 120 });
+			info.dwSize.X = std::max(info.dwSize.X, SHORT{120});
 			SetConsoleScreenBufferSize(GetStdHandle(STD_OUTPUT_HANDLE), info.dwSize);
 		}
 

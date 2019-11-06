@@ -1,5 +1,4 @@
-﻿
-namespace ProconXInputTE
+﻿namespace ProconXInputTE
 {
 	namespace Tests
 	{

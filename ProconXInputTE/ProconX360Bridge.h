@@ -12,7 +12,7 @@ namespace ProconXInputTE
 	{
 	public:
 
-		ProconX360Bridge(hid_device_info* proCon, ::ViGEm::ViGEmClient* client);
+		ProconX360Bridge(hid_device_info *proCon, ::ViGEm::ViGEmClient *client);
 		~ProconX360Bridge();
 
 		struct RumbleParams
@@ -47,14 +47,14 @@ namespace ProconXInputTE
 		std::pair<int, int> largeMoterAmplification_{};
 		std::pair<int, int> smallMoterAmplification_{};
 		std::thread rumbleControlThread_{};
-		std::atomic_flag rumbleControlThreadRunning_{ ATOMIC_FLAG_INIT };
+		std::atomic_flag rumbleControlThreadRunning_{ATOMIC_FLAG_INIT};
 
-		RumbleParams largeRumbleParam = { { 130, 20, 216 }, { 142, 20, 216 }, };
-		RumbleParams smallRumbleParam = { { 72, 30, 176 }, { 100, 30, 176 } };
+		RumbleParams largeRumbleParam = {{130, 20, 216}, {142, 20, 216},};
+		RumbleParams smallRumbleParam = {{72, 30, 176}, {100, 30, 176}};
 
 	private:
-		void HandleControllerOutput(const ViGEm::X360OutputStatus& x360Output);
-		void HandleControllerInput(const ProControllerHid::InputStatus& inputStatus);
+		void HandleControllerOutput(const ViGEm::X360OutputStatus &x360Output);
+		void HandleControllerInput(const ProControllerHid::InputStatus &inputStatus);
 		void RumbleControlTreadBody();
 		static int64_t GetCurrentTimestamp();
 	};

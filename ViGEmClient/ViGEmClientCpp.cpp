@@ -13,19 +13,19 @@ namespace ViGEm
 		std::map<T, TValue> map_{};
 		mutable std::mutex mutex_{};
 	public:
-		void Set(const T& key, const TValue& value)
+		void Set(const T &key, const TValue &value)
 		{
 			std::lock_guard<decltype(mutex_)> lock_(mutex_);
 			map_[key] = value;
 		}
 
-		TValue& Get(const T& key)
+		TValue& Get(const T &key)
 		{
 			std::lock_guard<decltype(mutex_)> lock_(mutex_);
 			return map_[key];
 		}
 
-		void Del(const T& key)
+		void Del(const T &key)
 		{
 			std::lock_guard<decltype(mutex_)> lock_(mutex_);
 			return map_[key];
@@ -56,13 +56,13 @@ namespace ViGEm
 		}
 
 		std::unique_ptr<X360Controller> AddX360Controller(
-			std::function<void(const X360OutputStatus& status)> callback) override
+			std::function<void(const X360OutputStatus &status)> callback) override
 		{
 			class X360ControllerImpl;
 			static ThreadSafeMap<std::pair<PVIGEM_CLIENT, PVIGEM_TARGET>, X360ControllerImpl*> instanceMap;
 			class X360ControllerImpl : public X360Controller
 			{
-				std::function<void(const X360OutputStatus& status)> callback_{};
+				std::function<void(const X360OutputStatus &status)> callback_{};
 				std::shared_ptr<ViGEmClientImpl> client_{};
 				PVIGEM_TARGET target_{};
 
@@ -70,7 +70,7 @@ namespace ViGEm
 					PVIGEM_CLIENT Client, PVIGEM_TARGET Target,
 					UCHAR LargeMotor, UCHAR SmallMotor, UCHAR LedNumber)
 				{
-					if (auto p = instanceMap.Get({ Client, Target }))
+					if (auto p = instanceMap.Get({Client, Target}))
 					{
 						if (p->callback_)
 						{
@@ -86,12 +86,12 @@ namespace ViGEm
 			public:
 				X360ControllerImpl(
 					std::shared_ptr<ViGEmClientImpl> client,
-					std::function<void(const X360OutputStatus& status)> callback)
+					std::function<void(const X360OutputStatus &status)> callback)
 					: callback_(std::move(callback))
 					, client_(std::move(client))
 					, target_(vigem_target_x360_alloc())
 				{
-					instanceMap.Set({ client_->client_, target_ }, this);
+					instanceMap.Set({client_->client_, target_}, this);
 					vigem_target_add(client_->client_, target_);
 				}
 

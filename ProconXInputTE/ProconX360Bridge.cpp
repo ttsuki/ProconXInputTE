@@ -1,4 +1,3 @@
-
 #include "ProconX360Bridge.h"
 #include <algorithm>
 #include <hidapi.h>
@@ -12,16 +11,16 @@ namespace ProconXInputTE
 	using ViGEm::X360InputStatus;
 	using ViGEm::X360OutputStatus;
 
-	ProconX360Bridge::ProconX360Bridge(hid_device_info* proCon, ::ViGEm::ViGEmClient* client)
+	ProconX360Bridge::ProconX360Bridge(hid_device_info *proCon, ::ViGEm::ViGEmClient *client)
 	{
 		x360_ = client->AddX360Controller(
-			[this](const X360OutputStatus& x360Output)
+			[this](const X360OutputStatus &x360Output)
 			{
 				HandleControllerOutput(x360Output);
 			});
 
 		controller_ = ProController::Connect(proCon, x360_->GetDeviceIndex(),
-			[this](const InputStatus& proconInput)
+			[this](const InputStatus &proconInput)
 			{
 				HandleControllerInput(proconInput);
 			});
@@ -71,15 +70,15 @@ namespace ProconXInputTE
 		return lastOutputOut_;
 	}
 
-	void ProconX360Bridge::HandleControllerOutput(const X360OutputStatus& x360Output)
+	void ProconX360Bridge::HandleControllerOutput(const X360OutputStatus &x360Output)
 	{
 		{
 			std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
-			lastOutput_ = { GetCurrentTimestamp(), x360Output };
+			lastOutput_ = {GetCurrentTimestamp(), x360Output};
 		}
 	}
 
-	void ProconX360Bridge::HandleControllerInput(const InputStatus& inputStatus)
+	void ProconX360Bridge::HandleControllerInput(const InputStatus &inputStatus)
 	{
 		ViGEm::X360InputStatus status =
 		{
@@ -111,10 +110,10 @@ namespace ProconXInputTE
 			(static_cast<int16_t>(inputStatus.RightStick.AxisY) << 4) - 32767,
 		};
 		x360_->Report(status);
-		
+
 		{
 			std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
-			lastInput_ = { GetCurrentTimestamp(), inputStatus };
+			lastInput_ = {GetCurrentTimestamp(), inputStatus};
 		}
 	}
 
@@ -123,16 +122,24 @@ namespace ProconXInputTE
 		auto clock = std::chrono::steady_clock::now();
 		while (rumbleControlThreadRunning_.test_and_set())
 		{
-			largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first - largeRumbleParam.Left.DecaySpeed, 0);
-			smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first - smallRumbleParam.Left.DecaySpeed, 0);
-			largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second - largeRumbleParam.Right.DecaySpeed, 0);
-			smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second - smallRumbleParam.Right.DecaySpeed, 0);
+			largeMoterAmplification_.first = std::max<int>(
+				largeMoterAmplification_.first - largeRumbleParam.Left.DecaySpeed, 0);
+			smallMoterAmplification_.first = std::max<int>(
+				smallMoterAmplification_.first - smallRumbleParam.Left.DecaySpeed, 0);
+			largeMoterAmplification_.second = std::max<int>(
+				largeMoterAmplification_.second - largeRumbleParam.Right.DecaySpeed, 0);
+			smallMoterAmplification_.second = std::max<int>(
+				smallMoterAmplification_.second - smallRumbleParam.Right.DecaySpeed, 0);
 			{
 				std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
-				largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first, lastOutput_.second.largeRumble);
-				smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first, lastOutput_.second.smallRumble);
-				largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second, lastOutput_.second.largeRumble);
-				smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second, lastOutput_.second.smallRumble);
+				largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first,
+					lastOutput_.second.largeRumble);
+				smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first,
+					lastOutput_.second.smallRumble);
+				largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second,
+					lastOutput_.second.largeRumble);
+				smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second,
+					lastOutput_.second.smallRumble);
 			}
 
 			controller_->SetRumbleBasic(
@@ -148,10 +155,13 @@ namespace ProconXInputTE
 
 			{
 				std::lock_guard<decltype(lastOutputOutMutex_)> lock(lastOutputOutMutex_);
-				lastOutputOut_ = { GetCurrentTimestamp(), {
-					static_cast<uint8_t>(largeMoterAmplification_.first), 
-					static_cast<uint8_t>(smallMoterAmplification_.first),
-					0 } };
+				lastOutputOut_ = {
+					GetCurrentTimestamp(), {
+						static_cast<uint8_t>(largeMoterAmplification_.first),
+						static_cast<uint8_t>(smallMoterAmplification_.first),
+						0
+					}
+				};
 			}
 
 			clock += std::chrono::milliseconds(16);
@@ -160,10 +170,10 @@ namespace ProconXInputTE
 
 		controller_->SetRumbleBasic(0, 0, 0, 0);
 	}
+
 	int64_t ProconX360Bridge::GetCurrentTimestamp()
 	{
 		using namespace std::chrono;
 		return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 	}
-
 }

@@ -47,8 +47,8 @@ namespace ViGEm
 	{
 	public:
 		X360Controller() = default;
-		X360Controller(const X360Controller& other) = delete;
-		X360Controller& operator=(const X360Controller& other) = delete;
+		X360Controller(const X360Controller &other) = delete;
+		X360Controller& operator=(const X360Controller &other) = delete;
 		virtual ~X360Controller() = default;
 		virtual void Report(X360InputStatus inputStatus) = 0;
 		virtual int GetDeviceIndex() const = 0;
@@ -60,13 +60,13 @@ namespace ViGEm
 	{
 	public:
 		ViGEmClient() = default;
-		ViGEmClient(const ViGEmClient& other) = delete;
-		ViGEmClient& operator=(const ViGEmClient& other) = delete;
+		ViGEmClient(const ViGEmClient &other) = delete;
+		ViGEmClient& operator=(const ViGEmClient &other) = delete;
 		virtual ~ViGEmClient() = default;
 
 		virtual bool IsConnected() const = 0;
 		virtual std::unique_ptr<X360Controller> AddX360Controller(
-			std::function<void(const X360OutputStatus& status)> callback) = 0;
+			std::function<void(const X360OutputStatus &status)> callback) = 0;
 
 		static std::shared_ptr<ViGEmClient> Connect();
 	};

@@ -8,7 +8,7 @@ namespace ProconXInputTE
 	namespace Tests
 	{
 		std::string StatusString(
-			const ProControllerHid::InputStatus& input,
+			const ProControllerHid::InputStatus &input,
 			bool withClock, bool withRaw = false);
 
 		void SetupConsoleWindow();
