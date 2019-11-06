@@ -21,7 +21,7 @@ namespace ProControllerHid
 		return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 	}
 
-	static void DumpPacket(const char* msg, const Buffer& data, int start = 0, int count = -1, uint64_t clock = tick())
+	static void DumpPacket(const char *msg, const Buffer &data, int start = 0, int count = -1, uint64_t clock = tick())
 	{
 #ifdef LOG_PACKET
 		static std::mutex m;
@@ -42,9 +42,9 @@ namespace ProControllerHid
 		uint8_t playerLedStatus_{};
 
 		std::thread controllerUpdaterThread_{};
-		std::atomic_flag controllerUpdaterThreadRunning_{ ATOMIC_FLAG_INIT };
+		std::atomic_flag controllerUpdaterThreadRunning_{ATOMIC_FLAG_INIT};
 
-		std::function<void(const InputStatus& status)> statusCallback_{};
+		std::function<void(const InputStatus &status)> statusCallback_{};
 		bool statusCallbackEnabled_{};
 		std::mutex statusCallbackCalling_{};
 
@@ -61,8 +61,8 @@ namespace ProControllerHid
 		} usbCommandQueue_{}, subCommandQueue_{};
 
 	public:
-		ProControllerImpl(const hid_device_info* devInfo, int index,
-			std::function<void(const InputStatus& status)> statusCallback);
+		ProControllerImpl(const hid_device_info *devInfo, int index,
+			std::function<void(const InputStatus &status)> statusCallback);
 		~ProControllerImpl() override;
 
 		void StartStatusCallback() override;
@@ -75,12 +75,12 @@ namespace ProControllerHid
 		void SetPlayerLed(uint8_t playerLed) override;
 
 	private:
-		void SendUsbCommand(uint8_t usbCommand, const HidIo::Buffer& data, bool waitAck);
-		void SendSubCommand(uint8_t subCommand, const HidIo::Buffer& data, bool waitAck);
+		void SendUsbCommand(uint8_t usbCommand, const HidIo::Buffer &data, bool waitAck);
+		void SendSubCommand(uint8_t subCommand, const HidIo::Buffer &data, bool waitAck);
 		void SendRumble();
 
-		void OnPacket(const HidIo::Buffer& data);
-		void OnStatus(const HidIo::Buffer& data);
+		void OnPacket(const HidIo::Buffer &data);
+		void OnStatus(const HidIo::Buffer &data);
 	};
 
 	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, std::chrono::milliseconds timeout)
@@ -113,17 +113,17 @@ namespace ProControllerHid
 		}
 
 		return signal_.wait_until(lock, it->second,
-			[this, command] { return pending_.count(command) == 0; })
+				[this, command] { return pending_.count(command) == 0; })
 			|| pending_.count(command) == 0;
 	}
 
-	ProControllerImpl::ProControllerImpl(const hid_device_info* devInfo, int index,
-		std::function<void(const InputStatus& status)> statusCallback)
+	ProControllerImpl::ProControllerImpl(const hid_device_info *devInfo, int index,
+		std::function<void(const InputStatus &status)> statusCallback)
 	{
 		SetRumbleBasic(0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80);
 		SetPlayerLed((1 << index) - 1);
 
-		bool openResult = device_.OpenDevice(devInfo->path, [this](const Buffer& data) { OnPacket(data); });
+		bool openResult = device_.OpenDevice(devInfo->path, [this](const Buffer &data) { OnPacket(data); });
 		if (!openResult)
 		{
 			return;
@@ -134,10 +134,10 @@ namespace ProControllerHid
 		SendUsbCommand(0x02, {}, true); // Handshake
 		SendUsbCommand(0x04, {}, false); // HID only-mode(No use Bluetooth)
 
-		SendSubCommand(0x40, { 0x00 }, true); // disable imuData
-		SendSubCommand(0x48, { 0x01 }, true); // enable Rumble
-		SendSubCommand(0x38, { 0x2F, 0x10, 0x11, 0x33, 0x33 }, true); // Set HOME Light animation
-		SendSubCommand(0x30, { playerLedStatus_ }, true); // Set Player LED Status
+		SendSubCommand(0x40, {0x00}, true); // disable imuData
+		SendSubCommand(0x48, {0x01}, true); // enable Rumble
+		SendSubCommand(0x38, {0x2F, 0x10, 0x11, 0x33, 0x33}, true); // Set HOME Light animation
+		SendSubCommand(0x30, {playerLedStatus_}, true); // Set Player LED Status
 
 		statusCallback_ = std::move(statusCallback);
 
@@ -157,7 +157,7 @@ namespace ProControllerHid
 					if (playerLedStatusSending != playerLedStatus_ || playerLedStatus != playerLedStatus_)
 					{
 						playerLedStatusSending = playerLedStatus_;
-						SendSubCommand(0x30, { playerLedStatusSending }, false);
+						SendSubCommand(0x30, {playerLedStatusSending}, false);
 						return true;
 					}
 					return false;
@@ -165,8 +165,10 @@ namespace ProControllerHid
 
 				while (controllerUpdaterThreadRunning_.test_and_set())
 				{
-					if (updatePlayerLedStatus()) { }
-					else 
+					if (updatePlayerLedStatus())
+					{
+					}
+					else
 					{
 						SendRumble();
 					}
@@ -184,8 +186,8 @@ namespace ProControllerHid
 			controllerUpdaterThreadRunning_.clear();
 			controllerUpdaterThread_.join();
 		}
-		SendSubCommand(0x38, { 0x00 }, true); // Set HOME Light animation
-		SendSubCommand(0x30, { 0x00 }, true); // Set Player LED
+		SendSubCommand(0x38, {0x00}, true); // Set HOME Light animation
+		SendSubCommand(0x30, {0x00}, true); // Set Player LED
 		SendUsbCommand(0x05, {}, false); // Allows the Joy-Con or Pro Controller to time out and talk Bluetooth again.
 		//ExecSubCommand(0x06, { 0x00 }, false); // Set HCI state (sleep mode)
 		device_.CloseDevice();
@@ -219,7 +221,7 @@ namespace ProControllerHid
 		playerLedStatus_ = playerLed;
 	}
 
-	void ProControllerImpl::SendUsbCommand(uint8_t usbCommand, const Buffer& data, bool waitAck)
+	void ProControllerImpl::SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck)
 	{
 		Buffer buf = {
 			0x80,
@@ -240,7 +242,7 @@ namespace ProControllerHid
 		}
 	}
 
-	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer& data, bool waitAck)
+	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck)
 	{
 		Buffer buf = {
 			0x01, // SubCommand
@@ -251,7 +253,7 @@ namespace ProControllerHid
 		buf += {subCommand};
 		buf += data;
 		DumpPacket("SubCmd>", buf, 10);
-		
+
 		subCommandQueue_.Register(subCommand);
 		device_.SendPacket(buf);
 
@@ -276,7 +278,7 @@ namespace ProControllerHid
 		device_.SendPacket(buf);
 	}
 
-	void ProControllerImpl::OnPacket(const Buffer& data)
+	void ProControllerImpl::OnPacket(const Buffer &data)
 	{
 		if (data.size())
 		{
@@ -303,7 +305,7 @@ namespace ProControllerHid
 		}
 	}
 
-	void ProControllerImpl::OnStatus(const Buffer& data)
+	void ProControllerImpl::OnStatus(const Buffer &data)
 	{
 		union
 		{
@@ -336,16 +338,16 @@ namespace ProControllerHid
 		}
 	}
 
-	std::unique_ptr<ProController> ProController::Connect(const hid_device_info* devInfo, int index,
-		std::function<void(const InputStatus& status)> statusCallback)
+	std::unique_ptr<ProController> ProController::Connect(const hid_device_info *devInfo, int index,
+		std::function<void(const InputStatus &status)> statusCallback)
 	{
 		return std::make_unique<ProControllerImpl>(devInfo, index, statusCallback);
 	}
 
 	HidDeviceCollection EnumerateProControllers()
 	{
-		constexpr unsigned short kNintendoVID{ 0x057E };
-		constexpr unsigned short kProControllerPID{ 0x2009 };
+		constexpr unsigned short kNintendoVID{0x057E};
+		constexpr unsigned short kProControllerPID{0x2009};
 		return HidDeviceCollection::EnumerateDevices(kNintendoVID, kProControllerPID);
 	}
 }

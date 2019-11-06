@@ -13,7 +13,7 @@ namespace ProControllerHid
 			size_ = list.size();
 		}
 
-		Buffer& Buffer::operator +=(const Buffer& data)
+		Buffer& Buffer::operator +=(const Buffer &data)
 		{
 			for (int i = 0; i < data.size(); i++)
 			{
@@ -23,7 +23,7 @@ namespace ProControllerHid
 			return *this;
 		}
 
-		void BufferQueue::Signal(const Buffer& data)
+		void BufferQueue::Signal(const Buffer &data)
 		{
 			std::lock_guard<decltype(mutex_)> lock(mutex_);
 			if (queue_.size() < 16)
@@ -53,7 +53,7 @@ namespace ProControllerHid
 			CloseDevice();
 		}
 
-		bool HidDevice::OpenDevice(const char* path)
+		bool HidDevice::OpenDevice(const char *path)
 		{
 			dev_ = hid_open_path(path);
 			return dev_;
@@ -65,7 +65,7 @@ namespace ProControllerHid
 			dev_ = nullptr;
 		}
 
-		int HidDevice::SendPacket(const Buffer& data)
+		int HidDevice::SendPacket(const Buffer &data)
 		{
 			return hid_write(dev_, data.data(), data.size());
 		}
@@ -86,7 +86,7 @@ namespace ProControllerHid
 			CloseDevice();
 		}
 
-		bool HidDeviceThreaded::OpenDevice(const char* path, std::function<void(const Buffer& data)> onPacket)
+		bool HidDeviceThreaded::OpenDevice(const char *path, std::function<void(const Buffer &data)> onPacket)
 		{
 			CloseDevice();
 
@@ -108,54 +108,54 @@ namespace ProControllerHid
 
 			senderThreadRunning_.test_and_set();
 			senderThread_ = std::thread([this, threadName = std::string(path) + "-SenderThread"]
+			{
+				SysDep::SetThreadName(threadName.c_str());
+				SysDep::SetThreadPriorityToRealtime();
+				while (true)
 				{
-					SysDep::SetThreadName(threadName.c_str());
-					SysDep::SetThreadPriorityToRealtime();
-					while (true)
+					Buffer data = senderQueue_.Wait();
+					if (!senderThreadRunning_.test_and_set()) { break; }
+					if (data.size())
 					{
-						Buffer data = senderQueue_.Wait();
-						if (!senderThreadRunning_.test_and_set()) { break; }
-						if (data.size())
+						if (deviceToSend_.SendPacket(data) < 0)
 						{
-							if (deviceToSend_.SendPacket(data) < 0)
-							{
-								// failed.
-							}
+							// failed.
 						}
 					}
-				});
+				}
+			});
 
 			receiverThreadRunning_.test_and_set();
 			receiverThread_ = std::thread([this, threadName = std::string(path) + "-ReceiverThread"]
+			{
+				SysDep::SetThreadName(threadName.c_str());
+				SysDep::SetThreadPriorityToRealtime();
+				while (receiverThreadRunning_.test_and_set())
 				{
-					SysDep::SetThreadName(threadName.c_str());
-					SysDep::SetThreadPriorityToRealtime();
-					while (receiverThreadRunning_.test_and_set())
+					Buffer data;
 					{
-						Buffer data;
+						while (true)
 						{
-							while (true)
-							{
-								data = deviceToReceive_.ReceivePacket(100);
-								if (data.size()) { break; }
-							}
+							data = deviceToReceive_.ReceivePacket(100);
+							if (data.size()) { break; }
 						}
-						receiveQueue_.Signal(data);
 					}
-				});
+					receiveQueue_.Signal(data);
+				}
+			});
 
 			dispatcherThreadRunning_.test_and_set();
 			dispatcherThread_ = std::thread([this, threadName = std::string(path) + "-DispatcherThread"]
+			{
+				SysDep::SetThreadName(threadName.c_str());
+				SysDep::SetThreadPriorityToRealtime();
+				while (true)
 				{
-					SysDep::SetThreadName(threadName.c_str());
-					SysDep::SetThreadPriorityToRealtime();
-					while (true)
-					{
-						Buffer data = receiveQueue_.Wait();
-						if (!dispatcherThreadRunning_.test_and_set()) { break; }
-						onPacket_(data);
-					}
-				});
+					Buffer data = receiveQueue_.Wait();
+					if (!dispatcherThreadRunning_.test_and_set()) { break; }
+					onPacket_(data);
+				}
+			});
 
 			return running_ = true;
 		}
@@ -190,13 +190,12 @@ namespace ProControllerHid
 			onPacket_ = nullptr;
 		}
 
-		int HidDeviceThreaded::SendPacket(const Buffer& data)
+		int HidDeviceThreaded::SendPacket(const Buffer &data)
 		{
 			if (!running_) { return 0; }
-		
+
 			senderQueue_.Signal(data);
 			return data.size();
 		}
-
 	}
 }

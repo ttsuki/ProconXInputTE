@@ -6,14 +6,15 @@
 #include "HidDeviceCollection.h"
 
 struct hid_device_info;
+
 namespace ProControllerHid
 {
 	class ControllerDevice
 	{
 	public:
 		ControllerDevice() = default;
-		ControllerDevice(const ControllerDevice& other) = delete;
-		ControllerDevice& operator=(const ControllerDevice& other) = delete;
+		ControllerDevice(const ControllerDevice &other) = delete;
+		ControllerDevice& operator=(const ControllerDevice &other) = delete;
 		virtual ~ControllerDevice() = default;
 	};
 
@@ -68,10 +69,10 @@ namespace ProControllerHid
 	{
 	public:
 		ProController() = default;
-		ProController(const ProController& other) = delete;
-		ProController& operator=(const ProController& other) = delete;
+		ProController(const ProController &other) = delete;
+		ProController& operator=(const ProController &other) = delete;
 		virtual ~ProController() = default;
-		
+
 		virtual void StartStatusCallback() = 0;
 		virtual void StopStatusCallback() = 0;
 
@@ -81,9 +82,8 @@ namespace ProControllerHid
 
 		virtual void SetPlayerLed(uint8_t playerLed) = 0;
 
-		static std::unique_ptr<ProController> Connect(const hid_device_info* devInfo, int index,
-			std::function<void(const InputStatus& status)> statusCallback);
-
+		static std::unique_ptr<ProController> Connect(const hid_device_info *devInfo, int index,
+			std::function<void(const InputStatus &status)> statusCallback);
 	};
 
 	HidDeviceCollection EnumerateProControllers();
