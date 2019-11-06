@@ -344,10 +344,15 @@ namespace ProControllerHid
 		return std::make_unique<ProControllerImpl>(pathToDevice, index, statusCallback);
 	}
 
-	HidDeviceCollection EnumerateProControllers()
+	std::vector<std::string> ProController::EnumerateProControllerDevicePaths()
 	{
+		std::vector<std::string> result;
 		constexpr unsigned short kNintendoVID{0x057E};
 		constexpr unsigned short kProControllerPID{0x2009};
-		return HidDeviceCollection::EnumerateDevices(kNintendoVID, kProControllerPID);
+		for (auto &&d : HidIo::EnumerateConnectedDevices(kNintendoVID, kProControllerPID))
+		{
+			result.push_back(d.devicePath);
+		}
+		return result;
 	}
 }

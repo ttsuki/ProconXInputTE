@@ -44,14 +44,14 @@ namespace ProconXInputTE
 
 			std::cout << "Finding Pro Controllers..." << std::endl;
 			std::vector<std::unique_ptr<ProconX360Bridge>> bridges;
-			for (auto device : EnumerateProControllers())
+			for (const auto &devPath : ProController::EnumerateProControllerDevicePaths())
 			{
 				std::cout << "- Device found:" << std::endl;
-				std::cout << "  Path: " << device.path << std::endl;
-				std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
-				std::wcout << L"  Product: " << device.product_string << std::endl;
+				std::cout << "  Path: " << devPath << std::endl;
+				//std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
+				//std::wcout << L"  Product: " << device.product_string << std::endl;
 
-				bridges.emplace_back(std::make_unique<ProconX360Bridge>(device.path, client.get()));
+				bridges.emplace_back(std::make_unique<ProconX360Bridge>(devPath.c_str(), client.get()));
 				std::cout << "  Connected as Virtual X360 Controller"
 					<< " index[" << bridges.back()->GetIndex() << "]"
 					<< std::endl;
