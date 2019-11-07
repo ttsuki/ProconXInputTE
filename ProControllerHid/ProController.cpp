@@ -36,7 +36,7 @@ namespace ProControllerHid
 		HidIo::HidDeviceThreaded device_{};
 
 		uint8_t nextPacketNumber_{};
-		HidIo::Buffer rumbleStatus_{};
+		Buffer rumbleStatus_{};
 		uint8_t playerLedStatus_{};
 
 		std::thread controllerUpdaterThread_{};
@@ -73,12 +73,12 @@ namespace ProControllerHid
 		void SetPlayerLed(uint8_t playerLed) override;
 
 	private:
-		void SendUsbCommand(uint8_t usbCommand, const HidIo::Buffer &data, bool waitAck);
-		void SendSubCommand(uint8_t subCommand, const HidIo::Buffer &data, bool waitAck);
+		void SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck);
+		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck);
 		void SendRumble();
 
-		void OnPacket(const HidIo::Buffer &data);
-		void OnStatus(const HidIo::Buffer &data);
+		void OnPacket(const Buffer &data);
+		void OnStatus(const Buffer &data);
 	};
 
 	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, std::chrono::milliseconds timeout)
