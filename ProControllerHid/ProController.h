@@ -55,12 +55,19 @@ namespace ProControllerHid
 		unsigned padding_ : 8;
 	};
 
+	struct SensorStatus
+	{
+		int16_t X, Y, Z;
+	};
+
 	struct InputStatus
 	{
 		uint64_t clock;
 		StickStatus LeftStick;
 		StickStatus RightStick;
 		ButtonStatus Buttons;
+		SensorStatus Accelerometer;
+		SensorStatus Gyroscope;
 	};
 
 	class ProController : public ControllerDevice
