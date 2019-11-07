@@ -70,6 +70,27 @@ namespace ProControllerHid
 		SensorStatus Gyroscope;
 	};
 
+	struct CorrectedInputStatus
+	{
+		uint64_t clock;
+
+		struct StickStatus
+		{
+			float X, Y;
+		};
+
+		struct SensorStatus
+		{
+			float X, Y, Z;
+		};
+
+		StickStatus LeftStick;
+		StickStatus RightStick;
+		ButtonStatus Buttons;
+		SensorStatus Accelerometer;
+		SensorStatus Gyroscope;
+	};
+
 	class ProController : public ControllerDevice
 	{
 	public:
@@ -80,6 +101,7 @@ namespace ProControllerHid
 
 		virtual void StartStatusCallback() = 0;
 		virtual void StopStatusCallback() = 0;
+		virtual CorrectedInputStatus CorrectInput(const InputStatus &raw) = 0;
 
 		virtual void SetRumbleBasic(
 			uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp = 0x00, uint8_t rightHighAmp = 0x00,
