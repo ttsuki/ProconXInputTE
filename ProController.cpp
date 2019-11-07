@@ -34,6 +34,7 @@ namespace ProControllerHid
 	class ProControllerImpl final : public ProController
 	{
 		using PacketProc = std::function<void(const Buffer &)>;
+		using Clock = std::chrono::steady_clock;
 
 		HidIo::HidDeviceThreaded device_{};
 		bool imuSensorsEnabled_{};
@@ -45,7 +46,7 @@ namespace ProControllerHid
 		std::thread controllerUpdaterThread_{};
 		std::atomic_flag controllerUpdaterThreadRunning_{ATOMIC_FLAG_INIT};
 
-		std::function<void(const InputStatus &status)> statusCallback_{};
+		InputStatusCallback statusCallback_{};
 		bool statusCallbackEnabled_{};
 		std::mutex statusCallbackCalling_{};
 
@@ -53,9 +54,9 @@ namespace ProControllerHid
 		{
 			std::shared_mutex mutex_{};
 			std::condition_variable_any signal_{};
-			std::map<uint8_t, std::pair<std::chrono::steady_clock::time_point, PacketProc>> pending_{};
+			std::map<uint8_t, std::pair<Clock::time_point, PacketProc>> pending_{};
 		public:
-			void Register(uint8_t command, PacketProc onReply = nullptr, std::chrono::milliseconds timeout = std::chrono::milliseconds(60));
+			void Register(uint8_t command, PacketProc onReply = nullptr, Clock::duration timeout = std::chrono::milliseconds(60));
 			void Signal(uint8_t command, const Buffer &replyPacket);
 			bool Pending(uint8_t command);
 			bool Wait(uint8_t command);
@@ -86,8 +87,7 @@ namespace ProControllerHid
 		} calibrationParameters_{};
 
 	public:
-		ProControllerImpl(const char *pathToDevice, int index,
-			std::function<void(const InputStatus &status)> statusCallback);
+		ProControllerImpl(const char *pathToDevice, int index, InputStatusCallback statusCallback);
 		~ProControllerImpl() override;
 
 		void StartStatusCallback() override;
@@ -111,10 +111,10 @@ namespace ProControllerHid
 		void OnStatus(const Buffer &data);
 	};
 
-	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, PacketProc onReply, std::chrono::milliseconds timeout)
+	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, PacketProc onReply, Clock::duration timeout)
 	{
 		std::lock_guard<decltype(mutex_)> lock(mutex_);
-		pending_[command] = {std::chrono::steady_clock::now() + timeout, std::move(onReply)};
+		pending_[command] = {Clock::now() + timeout, std::move(onReply)};
 	}
 
 	void ProControllerImpl::PendingCommandMap::Signal(uint8_t command, const Buffer &replyPacket)
@@ -134,7 +134,7 @@ namespace ProControllerHid
 	{
 		std::shared_lock<decltype(mutex_)> lock(mutex_);
 		auto it = pending_.find(command);
-		return it != pending_.end() && it->second.first < std::chrono::steady_clock::now();
+		return it != pending_.end() && it->second.first < Clock::now();
 	}
 
 	bool ProControllerImpl::PendingCommandMap::Wait(uint8_t command)
@@ -151,9 +151,7 @@ namespace ProControllerHid
 			|| pending_.count(command) == 0;
 	}
 
-	ProControllerImpl::ProControllerImpl(
-		const char *pathToDevice, int index,
-		std::function<void(const InputStatus &status)> statusCallback)
+	ProControllerImpl::ProControllerImpl(const char *pathToDevice, int index, InputStatusCallback statusCallback)
 	{
 		imuSensorsEnabled_ = true;
 
@@ -186,7 +184,7 @@ namespace ProControllerHid
 			{
 				SysDep::SetThreadName(threadName.c_str());
 				SysDep::SetThreadPriorityToRealtime();
-				auto clock = std::chrono::steady_clock::now();
+				auto clock = Clock::now();
 
 				decltype(playerLedStatus_) playerLedStatus = playerLedStatus_;
 				decltype(playerLedStatus_) playerLedStatusSending = playerLedStatus_;
@@ -546,11 +544,9 @@ namespace ProControllerHid
 		}
 	}
 
-	std::unique_ptr<ProController> ProController::Connect(
-		const char *pathToDevice, int index,
-		std::function<void(const InputStatus &status)> statusCallback)
+	std::unique_ptr<ProController> ProController::Connect(const char *pathToDevice, int index, InputStatusCallback statusCallback)
 	{
-		return std::make_unique<ProControllerImpl>(pathToDevice, index, statusCallback);
+		return std::make_unique<ProControllerImpl>(pathToDevice, index, std::move(statusCallback));
 	}
 
 	std::vector<std::string> ProController::EnumerateProControllerDevicePaths()
