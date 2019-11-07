@@ -33,6 +33,8 @@ namespace ProControllerHid
 
 	class ProControllerImpl final : public ProController
 	{
+		using PacketProc = std::function<void(const Buffer &)>;
+
 		HidIo::HidDeviceThreaded device_{};
 
 		uint8_t nextPacketNumber_{};
@@ -50,10 +52,10 @@ namespace ProControllerHid
 		{
 			std::shared_mutex mutex_{};
 			std::condition_variable_any signal_{};
-			std::map<uint8_t, std::chrono::steady_clock::time_point> pending_{};
+			std::map<uint8_t, std::pair<std::chrono::steady_clock::time_point, PacketProc>> pending_{};
 		public:
-			void Register(uint8_t command, std::chrono::milliseconds timeout = std::chrono::milliseconds(60));
-			void Signal(uint8_t command);
+			void Register(uint8_t command, PacketProc onReply = nullptr, std::chrono::milliseconds timeout = std::chrono::milliseconds(60));
+			void Signal(uint8_t command, const Buffer &replyPacket);
 			bool Pending(uint8_t command);
 			bool Wait(uint8_t command);
 		} usbCommandQueue_{}, subCommandQueue_{};
@@ -74,23 +76,30 @@ namespace ProControllerHid
 
 	private:
 		void SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck);
-		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck);
+		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, PacketProc callback = nullptr);
+		Buffer ReadSpiMemory(uint16_t address, uint8_t length);
 		void SendRumble();
 
 		void OnPacket(const Buffer &data);
 		void OnStatus(const Buffer &data);
 	};
 
-	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, std::chrono::milliseconds timeout)
+	void ProControllerImpl::PendingCommandMap::Register(uint8_t command, PacketProc onReply, std::chrono::milliseconds timeout)
 	{
 		std::lock_guard<decltype(mutex_)> lock(mutex_);
-		pending_[command] = std::chrono::steady_clock::now() + timeout;
+		pending_[command] = {std::chrono::steady_clock::now() + timeout, std::move(onReply)};
 	}
 
-	void ProControllerImpl::PendingCommandMap::Signal(uint8_t command)
+	void ProControllerImpl::PendingCommandMap::Signal(uint8_t command, const Buffer& replyPacket)
 	{
 		std::lock_guard<decltype(mutex_)> lock(mutex_);
-		pending_.erase(command);
+		auto it = pending_.find(command);
+		if (it != pending_.end())
+		{
+			const PacketProc callback = std::move(it->second.second);
+			pending_.erase(command);
+			if (callback) { callback(replyPacket); }
+		}
 		signal_.notify_all();
 	}
 
@@ -98,7 +107,7 @@ namespace ProControllerHid
 	{
 		std::shared_lock<decltype(mutex_)> lock(mutex_);
 		auto it = pending_.find(command);
-		return it != pending_.end() && it->second < std::chrono::steady_clock::now();
+		return it != pending_.end() && it->second.first < std::chrono::steady_clock::now();
 	}
 
 	bool ProControllerImpl::PendingCommandMap::Wait(uint8_t command)
@@ -110,7 +119,7 @@ namespace ProControllerHid
 			return true;
 		}
 
-		return signal_.wait_until(lock, it->second,
+		return signal_.wait_until(lock, it->second.first,
 				[this, command] { return pending_.count(command) == 0; })
 			|| pending_.count(command) == 0;
 	}
@@ -132,6 +141,17 @@ namespace ProControllerHid
 		SendUsbCommand(0x03, {}, true); // Set baudrate to 3Mbps
 		SendUsbCommand(0x02, {}, true); // Handshake
 		SendUsbCommand(0x04, {}, false); // HID only-mode(No use Bluetooth)
+
+		// Read calibration/parameters from controllers SPI memory.
+		Buffer sensorFactoryCalibration = ReadSpiMemory(0x6020, 24);
+		Buffer stick1FactoryCalibration = ReadSpiMemory(0x603D, 9);
+		Buffer stick2FactoryCalibration = ReadSpiMemory(0x6046, 9);
+		Buffer sensorFactoryParameter = ReadSpiMemory(0x6080, 6);
+		Buffer stick1FactoryParameter = ReadSpiMemory(0x6086, 18);
+		Buffer stick2FactoryParameter = ReadSpiMemory(0x6098, 18);
+		Buffer stick1UserCalibration = ReadSpiMemory(0x8010, 2 + 9);
+		Buffer stick2UserCalibration = ReadSpiMemory(0x801B, 2 + 9);
+		Buffer sensorUserCalibration = ReadSpiMemory(0x8026, 2 + 24);
 
 		SendSubCommand(0x03, {0x30}, true); // Set input report mode
 		SendSubCommand(0x40, {0x01}, true); // enable imuData
@@ -230,19 +250,19 @@ namespace ProControllerHid
 		buf += data;
 		DumpPacket("UsbCmd>", buf);
 
-		usbCommandQueue_.Register(usbCommand);
+		usbCommandQueue_.Register(usbCommand, nullptr);
 		device_.SendPacket(buf);
 		if (waitAck)
 		{
 			while (!usbCommandQueue_.Wait(usbCommand))
 			{
-				usbCommandQueue_.Register(usbCommand);
+				usbCommandQueue_.Register(usbCommand, nullptr);
 				device_.SendPacket(buf);
 			}
 		}
 	}
 
-	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck)
+	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, PacketProc callback)
 	{
 		Buffer buf = {
 			0x01, // SubCommand
@@ -254,17 +274,41 @@ namespace ProControllerHid
 		buf += data;
 		DumpPacket("SubCmd>", buf, 10);
 
-		subCommandQueue_.Register(subCommand);
+		subCommandQueue_.Register(subCommand, callback);
 		device_.SendPacket(buf);
 
 		if (waitAck)
 		{
 			while (!subCommandQueue_.Wait(subCommand))
 			{
-				subCommandQueue_.Register(subCommand);
+				subCommandQueue_.Register(subCommand, callback);
 				device_.SendPacket(buf);
 			}
 		}
+	}
+
+	Buffer ProControllerImpl::ReadSpiMemory(uint16_t address, uint8_t length)
+	{
+		Buffer result;
+		union
+		{
+			uint32_t addr32{};
+			uint8_t addr8[4];
+		};
+		addr32 = address;
+		SendSubCommand(0x10, {addr8[0], addr8[1], addr8[2], addr8[3], length}, true,
+			[&](const Buffer &reply)
+			{
+				const uint32_t replyAddress = reply[15] | reply[16] << 8 | reply[17] << 16 | reply[18] << 24;
+				const uint8_t replyLength = reply[19];
+				if (replyAddress == address && length == replyLength)
+				{
+					result.resize(length);
+					memcpy(result.data(), reply.data() + 20, length);
+				}
+			});
+
+		return result;
 	}
 
 	void ProControllerImpl::SendRumble()
@@ -290,12 +334,12 @@ namespace ProControllerHid
 				break;
 
 			case 0x21: // Reply to sub command.
-				subCommandQueue_.Signal(data[14]);
+				subCommandQueue_.Signal(data[14], data);
 				OnStatus(data);
 				break;
 
 			case 0x81: // Reply to usb command.
-				usbCommandQueue_.Signal(data[1]);
+				usbCommandQueue_.Signal(data[1], data);
 				break;
 
 			default:
