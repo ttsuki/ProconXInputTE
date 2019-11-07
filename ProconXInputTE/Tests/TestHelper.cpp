@@ -12,43 +12,48 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		template <class T, std::enable_if_t<std::is_trivially_copyable_v<T>, int>  = 0>
-		inline static int AsRaw32bit(T t)
+		template <class U, class T, std::enable_if_t<std::is_trivially_copyable_v<T>, U> = 0>
+		inline static U AsRawInt(T t)
 		{
 			union
 			{
 				T t_;
-				int i_;
+				U i_;
 			} x{t};
 			return x.i_;
 		}
 
-		std::string StatusString(
-			const ProControllerHid::InputStatus &input,
-			bool withClock, bool withRaw)
+		std::string InputStatusString::GetClockString() const
 		{
 			char clockStr[32];
 			snprintf(clockStr, sizeof(clockStr),
-				"%lld:",
+				"%lld",
 				input.clock);
+			return clockStr;
+		}
 
-			char rawInputStr[32];
+		std::string InputStatusString::GetRawDataString() const
+		{
+			char rawInputStr[64];
 			snprintf(rawInputStr, sizeof(rawInputStr),
-				"0x%06X,0x%06X,0x%06X:",
-				AsRaw32bit(input.LeftStick),
-				AsRaw32bit(input.RightStick),
-				AsRaw32bit(input.Buttons)
+				"%06X,%06X,%06X,%012llX,%012llX",
+				AsRawInt<uint32_t>(input.LeftStick),
+				AsRawInt<uint32_t>(input.RightStick),
+				AsRawInt<uint32_t>(input.Buttons),
+				AsRawInt<uint64_t>(input.Accelerometer),
+				AsRawInt<uint64_t>(input.Gyroscope)
 			);
+			return rawInputStr;
+		}
 
-			char statusText[256];
-			snprintf(statusText, sizeof(statusText),
-				"%s%s"
+		std::string InputStatusString::GetParsedInput() const
+		{
+			char parsedStr[256];
+			snprintf(parsedStr, sizeof(parsedStr),
 				"L(%4d,%4d),R(%4d,%4d)"
-				",D:%s%s%s%s%s%s%s%s"
+				",Buttons:%s%s%s%s%s%s%s%s"
 				"%s%s%s%s%s%s"
 				"%s%s%s%s",
-				withClock ? clockStr : "",
-				withRaw ? rawInputStr : "",
 
 				input.LeftStick.AxisX, input.LeftStick.AxisY,
 				input.RightStick.AxisX, input.RightStick.AxisY,
@@ -74,7 +79,18 @@ namespace ProconXInputTE
 				input.Buttons.HomeButton ? "H" : "",
 				input.Buttons.ShareButton ? "S" : ""
 			);
-			return std::string(statusText);
+			return parsedStr;
+		}
+
+		std::string InputStatusString::GetParsedImu() const
+		{
+			char imuStr[256]{};
+			snprintf(imuStr, sizeof(imuStr),
+				"Imu: Acl(%4d,%4d,%4d)/"
+				"Gyr(%4d,%4d,%4d)",
+				input.Accelerometer.X, input.Accelerometer.Y, input.Accelerometer.Z,
+				input.Gyroscope.X, input.Gyroscope.Y, input.Gyroscope.Z);
+			return imuStr;
 		}
 
 		void SetupConsoleWindow()
@@ -91,7 +107,7 @@ namespace ProconXInputTE
 
 		void WaitEscapeOrCtrlC()
 		{
-			std::cout << "Press Ctrl+C or ESCAPE to exit." << std::endl;
+			std::cout << "Press Ctrl+C or ESCAPE to exit.\n" << std::endl;
 			while (int ch = _getch())
 			{
 				if (ch == 3 || ch == 27) { break; }

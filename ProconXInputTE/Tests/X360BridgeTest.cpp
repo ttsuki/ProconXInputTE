@@ -91,7 +91,7 @@ namespace ProconXInputTE
 							message << " H:"
 								<< std::setw(3) << static_cast<int>(outputOut.smallRumble) << "/"
 								<< std::setw(3) << static_cast<int>(outputIn.smallRumble);
-							message << "  In " << StatusString(input, false, false);
+							message << "  In " << InputStatusString(input).GetParsedInput();
 							message << "\n";
 						}
 

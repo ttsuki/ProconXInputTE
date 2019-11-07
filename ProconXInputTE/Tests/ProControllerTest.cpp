@@ -12,6 +12,7 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
+		constexpr int StatusLines = 6;
 		void RunProconTest()
 		{
 			using namespace ProControllerHid;
@@ -39,17 +40,32 @@ namespace ProconXInputTE
 					int hf = s.RightStick.AxisX >> 4;
 					int ha = s.RightStick.AxisY >> 4;
 
-					std::string line(index, '\n');
-					line += "\x1b[2K";
-					line += std::to_string(index);
-					line += ">";
-					line += "Fb";
+					int led = s.Buttons.AButton << 0
+						| s.Buttons.BButton << 1
+						| s.Buttons.XButton << 2
+						| s.Buttons.YButton << 3;
+
+					std::string line(index * StatusLines, '\n');
+					InputStatusString st = s;
+					
+					line += "\x1b[2K" "---- Controller " + std::to_string(index) + "\n";
+					line += "\x1b[2K" "  > Clock=" + st.GetClockString() + " Report="+st.GetRawDataString() + "\n";
+					line += "\x1b[2K" "  > " + st.GetParsedInput() + "\n";
+					line += "\x1b[2K" "  > " + st.GetParsedImu() + "\n";
+
+					line += "\x1b[2K" "  > Vibration Test (L/R Button): ";
 					line += " lf/la=" + std::to_string(lf) + "/" + std::to_string(la);
 					line += " hf/ha=" + std::to_string(hf) + "/" + std::to_string(ha);
+					line += "\n";
 
-					line += StatusString(s, true, true);
-					line += "\r";
-					for (int i = 0; i < index; i++)
+					line += "\x1b[2K" "  > LED Test (ABXY Button): ";
+					line += led & 1 ? "*" : "_";
+					line += led & 2 ? "*" : "_";
+					line += led & 4 ? "*" : "_";
+					line += led & 8 ? "*" : "_";
+					line += "\n";
+
+					for (int i = 0; i < (index + 1) * StatusLines; i++)
 					{
 						line += "\x1b[1A";
 					}
@@ -67,11 +83,7 @@ namespace ProconXInputTE
 						lf, lf, hf, hf);
 
 					// player status led output
-					controller->SetPlayerLed(
-						s.Buttons.AButton << 0 |
-						s.Buttons.BButton << 1 |
-						s.Buttons.XButton << 2 |
-						s.Buttons.YButton << 3);
+					controller->SetPlayerLed(led);
 				};
 
 				controllers.emplace_back(ProController::Connect(devPath.c_str(), index + 1, callback));
@@ -85,7 +97,7 @@ namespace ProconXInputTE
 			}
 
 			std::cout << std::endl;
-			std::cout << "Controller started." << std::endl;
+			std::cout << "Controller starting...\n" << std::endl;
 			for (auto &&controller : controllers)
 			{
 				controller->StartStatusCallback();
@@ -96,7 +108,7 @@ namespace ProconXInputTE
 				controller->StopStatusCallback();
 			}
 
-			std::cout << std::string(controllers.size() + 1, '\n');
+			std::cout << std::string(controllers.size() * StatusLines + 1, '\n');
 			controllers.clear();
 			std::cout << "Closed." << std::endl;
 		}
