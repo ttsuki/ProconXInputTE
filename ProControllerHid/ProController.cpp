@@ -60,6 +60,30 @@ namespace ProControllerHid
 			bool Wait(uint8_t command);
 		} usbCommandQueue_{}, subCommandQueue_{};
 
+
+		struct SpiCalibrationParameters
+		{
+			struct SensorCalibration
+			{
+				struct Axis
+				{
+					int16_t Origin;
+					uint16_t Sensitivity;
+					int16_t HorizontalOffset;
+				} X, Y, Z;
+			} Accelerometer, Gyroscope;
+
+			struct StickCalibration
+			{
+				struct Range
+				{
+					int16_t MinValue, CenterValue, MaxValue;
+				} X, Y;
+
+				int16_t DeadZone, RangeRatio;
+			} LeftStick, RightStick;
+		} calibrationParameters_;
+
 	public:
 		ProControllerImpl(const char *pathToDevice, int index,
 			std::function<void(const InputStatus &status)> statusCallback);
@@ -67,6 +91,7 @@ namespace ProControllerHid
 
 		void StartStatusCallback() override;
 		void StopStatusCallback() override;
+		CorrectedInputStatus CorrectInput(const InputStatus &raw) override;
 
 		void SetRumbleBasic(
 			uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp, uint8_t rightHighAmp,
@@ -75,6 +100,7 @@ namespace ProControllerHid
 		void SetPlayerLed(uint8_t playerLed) override;
 
 	private:
+		SpiCalibrationParameters LoadCalibrationParametersFromSpiMemory();
 		void SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck);
 		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, PacketProc callback = nullptr);
 		Buffer ReadSpiMemory(uint16_t address, uint8_t length);
@@ -90,7 +116,7 @@ namespace ProControllerHid
 		pending_[command] = {std::chrono::steady_clock::now() + timeout, std::move(onReply)};
 	}
 
-	void ProControllerImpl::PendingCommandMap::Signal(uint8_t command, const Buffer& replyPacket)
+	void ProControllerImpl::PendingCommandMap::Signal(uint8_t command, const Buffer &replyPacket)
 	{
 		std::lock_guard<decltype(mutex_)> lock(mutex_);
 		auto it = pending_.find(command);
@@ -142,16 +168,7 @@ namespace ProControllerHid
 		SendUsbCommand(0x02, {}, true); // Handshake
 		SendUsbCommand(0x04, {}, false); // HID only-mode(No use Bluetooth)
 
-		// Read calibration/parameters from controllers SPI memory.
-		Buffer sensorFactoryCalibration = ReadSpiMemory(0x6020, 24);
-		Buffer stick1FactoryCalibration = ReadSpiMemory(0x603D, 9);
-		Buffer stick2FactoryCalibration = ReadSpiMemory(0x6046, 9);
-		Buffer sensorFactoryParameter = ReadSpiMemory(0x6080, 6);
-		Buffer stick1FactoryParameter = ReadSpiMemory(0x6086, 18);
-		Buffer stick2FactoryParameter = ReadSpiMemory(0x6098, 18);
-		Buffer stick1UserCalibration = ReadSpiMemory(0x8010, 2 + 9);
-		Buffer stick2UserCalibration = ReadSpiMemory(0x801B, 2 + 9);
-		Buffer sensorUserCalibration = ReadSpiMemory(0x8026, 2 + 24);
+		calibrationParameters_ = LoadCalibrationParametersFromSpiMemory();
 
 		SendSubCommand(0x03, {0x30}, true); // Set input report mode
 		SendSubCommand(0x40, {0x01}, true); // enable imuData
@@ -225,6 +242,47 @@ namespace ProControllerHid
 		statusCallbackEnabled_ = false;
 	}
 
+	CorrectedInputStatus ProControllerImpl::CorrectInput(const InputStatus &raw)
+	{
+		auto applyAccel = [](SpiCalibrationParameters::SensorCalibration::Axis a, int16_t value)
+		{
+			//if (abs(value) < 205) { return 0.0f; }
+			return value * 4.0f / static_cast<float>(a.Sensitivity - a.Origin);
+		};
+
+		auto applyGyro = [](SpiCalibrationParameters::SensorCalibration::Axis a, int16_t value)
+		{
+			//if (abs(value - a.Origin) < 75) { return 0.0f; }
+			return (value - a.Origin) * 0.0027777778f * 936.0f / (a.Sensitivity - a.Origin);
+		};
+
+		auto applyStick = [](SpiCalibrationParameters::StickCalibration a, SpiCalibrationParameters::StickCalibration::Range r, int16_t value)
+		{
+			int upperLower = r.CenterValue + a.DeadZone;
+			int lowerUpper = r.CenterValue - a.DeadZone;
+			float f{};
+			if (value >= upperLower) { f = static_cast<float>(value - upperLower) / (r.MaxValue - upperLower); }
+			else if (value <= lowerUpper) { f = -static_cast<float>(value - lowerUpper) / (r.MinValue - lowerUpper); }
+			else f = 0.0f;
+			return std::min(std::max(f, -1.0f), 1.0f);
+		};
+
+		CorrectedInputStatus result{};
+		result.LeftStick.X = applyStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.X, raw.LeftStick.AxisX);
+		result.LeftStick.Y = applyStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.Y, raw.LeftStick.AxisY);
+		result.RightStick.X = applyStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.X, raw.RightStick.AxisX);
+		result.RightStick.Y = applyStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.Y, raw.RightStick.AxisY);
+		result.Buttons = raw.Buttons;
+		result.Accelerometer.X = applyAccel(calibrationParameters_.Accelerometer.X, raw.Accelerometer.X);
+		result.Accelerometer.Y = applyAccel(calibrationParameters_.Accelerometer.Y, raw.Accelerometer.Y);
+		result.Accelerometer.Z = applyAccel(calibrationParameters_.Accelerometer.Z, raw.Accelerometer.Z);
+		result.Gyroscope.X = applyGyro(calibrationParameters_.Gyroscope.X, raw.Gyroscope.X);
+		result.Gyroscope.Y = applyGyro(calibrationParameters_.Gyroscope.Y, raw.Gyroscope.Y);
+		result.Gyroscope.Z = applyGyro(calibrationParameters_.Gyroscope.Z, raw.Gyroscope.Z);
+
+		return result;
+	}
+
 	void ProControllerImpl::SetRumbleBasic(
 		uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp, uint8_t rightHighAmp,
 		uint8_t leftLowFreq, uint8_t rightLowFreq, uint8_t leftHighFreq, uint8_t rightHighFreq)
@@ -239,6 +297,95 @@ namespace ProControllerHid
 	void ProControllerImpl::SetPlayerLed(uint8_t playerLed)
 	{
 		playerLedStatus_ = playerLed;
+	}
+
+
+	ProControllerImpl::SpiCalibrationParameters ProControllerImpl::LoadCalibrationParametersFromSpiMemory()
+	{
+		SpiCalibrationParameters result{};
+
+		// SensorCalibration
+		{
+			Buffer factory = ReadSpiMemory(0x6020, 24);
+			Buffer user = ReadSpiMemory(0x8026, 2 + 24);
+			const uint16_t *mem = reinterpret_cast<uint16_t*>(&factory[0]);
+			if (user[0] == 0xB2 && user[1] == 0xA1)
+			{
+				mem = reinterpret_cast<uint16_t*>(&user[2]);
+			}
+
+			result.Accelerometer.X.Origin = mem[0];
+			result.Accelerometer.Y.Origin = mem[1];
+			result.Accelerometer.Z.Origin = mem[2];
+			result.Accelerometer.X.Sensitivity = mem[3];
+			result.Accelerometer.Y.Sensitivity = mem[4];
+			result.Accelerometer.Z.Sensitivity = mem[5];
+			result.Gyroscope.X.Origin = mem[6];
+			result.Gyroscope.Y.Origin = mem[7];
+			result.Gyroscope.Z.Origin = mem[8];
+			result.Gyroscope.X.Sensitivity = mem[9];
+			result.Gyroscope.Y.Sensitivity = mem[10];
+			result.Gyroscope.Z.Sensitivity = mem[11];
+		}
+
+		{
+			// SensorParameter
+			Buffer factory = ReadSpiMemory(0x6080, 6);
+			const uint16_t *mem = reinterpret_cast<uint16_t*>(&factory[0]);
+			result.Accelerometer.X.HorizontalOffset = mem[0];
+			result.Accelerometer.Y.HorizontalOffset = mem[1];
+			result.Accelerometer.Z.HorizontalOffset = mem[2];
+		}
+
+		// Stick1
+		const auto ReadStick = [this](
+			uint16_t factoryCalibrationAddress,
+			uint16_t userCalibrationAddress,
+			uint16_t paramsAddress, int stickIndex)
+		-> SpiCalibrationParameters::StickCalibration
+		{
+			SpiCalibrationParameters::StickCalibration result{};
+
+			Buffer factory = ReadSpiMemory(factoryCalibrationAddress, 9);
+			Buffer user = ReadSpiMemory(userCalibrationAddress, 2 + 9);
+			Buffer params = ReadSpiMemory(paramsAddress, 18);
+
+			auto parse = [](const uint8_t bytes[3]) -> std::pair<uint16_t, uint16_t>
+			{
+				return {bytes[0] | (bytes[1] << 8 & 0xF00), bytes[1] >> 4 | bytes[2] << 4};
+			};
+
+			{
+				const uint8_t *mem = &factory[0];
+				if (user[0] == 0xB2 && user[1] == 0xA1)
+				{
+					mem = &user[2];
+				}
+				auto aboveCenter = parse(&mem[stickIndex == 0 ? 0 : 6]);
+				auto center = parse(&mem[stickIndex == 0 ? 3 : 0]);
+				auto belowCenter = parse(&mem[stickIndex == 0 ? 6 : 3]);
+				result.X.MinValue = center.first - belowCenter.first;
+				result.X.CenterValue = center.first;
+				result.X.MaxValue = center.first + aboveCenter.first;
+				result.Y.MinValue = center.second - belowCenter.second;
+				result.Y.CenterValue = center.second;
+				result.Y.MaxValue = center.second + aboveCenter.second;
+			}
+
+			{
+				const uint8_t *mem = &params[0];
+				auto stickParams = parse(&mem[3]);
+				result.DeadZone = stickParams.first;
+				result.RangeRatio = stickParams.second;
+			}
+
+			return result;
+		};
+
+		result.LeftStick = ReadStick(0x603D, 0x8010, 0x6086, 0);
+		result.RightStick = ReadStick(0x6046, 0x801D, 0x6098, 1);
+
+		return result;
 	}
 
 	void ProControllerImpl::SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck)

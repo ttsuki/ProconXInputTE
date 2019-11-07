@@ -23,19 +23,32 @@ namespace ProconXInputTE
 			return x.i_;
 		}
 
+		InputStatusString::InputStatusString(const ProControllerHid::InputStatus &input)
+			: input(input)
+		{
+		}
+
+		InputStatusString::InputStatusString(
+			const ProControllerHid::InputStatus &input,
+			const ProControllerHid::CorrectedInputStatus corrected)
+			: input(input)
+			, corrected(corrected)
+		{
+		}
+
 		std::string InputStatusString::GetClockString() const
 		{
-			char clockStr[32];
-			snprintf(clockStr, sizeof(clockStr),
+			char str[32];
+			snprintf(str, sizeof(str),
 				"%lld",
 				input.clock);
-			return clockStr;
+			return str;
 		}
 
 		std::string InputStatusString::GetRawDataString() const
 		{
-			char rawInputStr[64];
-			snprintf(rawInputStr, sizeof(rawInputStr),
+			char str[64];
+			snprintf(str, sizeof(str),
 				"%06X,%06X,%06X,%012llX,%012llX",
 				AsRawInt<uint32_t>(input.LeftStick),
 				AsRawInt<uint32_t>(input.RightStick),
@@ -43,14 +56,14 @@ namespace ProconXInputTE
 				AsRawInt<uint64_t>(input.Accelerometer),
 				AsRawInt<uint64_t>(input.Gyroscope)
 			);
-			return rawInputStr;
+			return str;
 		}
 
 		std::string InputStatusString::GetParsedInput() const
 		{
-			char parsedStr[256];
-			snprintf(parsedStr, sizeof(parsedStr),
-				"L(%4d,%4d),R(%4d,%4d)"
+			char str[256];
+			snprintf(str, sizeof(str),
+				"L(%4u,%4u),R(%4u,%4u)"
 				",Buttons:%s%s%s%s%s%s%s%s"
 				"%s%s%s%s%s%s"
 				"%s%s%s%s",
@@ -79,18 +92,38 @@ namespace ProconXInputTE
 				input.Buttons.HomeButton ? "H" : "",
 				input.Buttons.ShareButton ? "S" : ""
 			);
-			return parsedStr;
+			return str;
 		}
 
 		std::string InputStatusString::GetParsedImu() const
 		{
-			char imuStr[256]{};
-			snprintf(imuStr, sizeof(imuStr),
-				"Imu: Acl(%4d,%4d,%4d)/"
-				"Gyr(%4d,%4d,%4d)",
+			char str[256];
+			snprintf(str, sizeof(str),
+				"Imu: Acl(%4d,%4d,%4d)/Gyr(%4d,%4d,%4d)",
 				input.Accelerometer.X, input.Accelerometer.Y, input.Accelerometer.Z,
 				input.Gyroscope.X, input.Gyroscope.Y, input.Gyroscope.Z);
-			return imuStr;
+			return str;
+		}
+
+		std::string InputStatusString::GetCorrectedInput() const
+		{
+			char str[256];
+			snprintf(str, sizeof(str),
+				"L(%+.3f,%+.3f),R(%+.3f,%+.3f)",
+				corrected.LeftStick.X, corrected.LeftStick.Y,
+				corrected.RightStick.X, corrected.RightStick.Y
+			);
+			return str;
+		}
+
+		std::string InputStatusString::GetCorrectedImu() const
+		{
+			char str[256];
+			snprintf(str, sizeof(str),
+				"Imu: Acl(%+.4f,%+.4f,%+.4f)/Gyr(%+.4f,%+.4f,%+.4f)",
+				corrected.Accelerometer.X, corrected.Accelerometer.Y, corrected.Accelerometer.Z,
+				corrected.Gyroscope.X, corrected.Gyroscope.Y, corrected.Gyroscope.Z);
+			return str;
 		}
 
 		void SetupConsoleWindow()

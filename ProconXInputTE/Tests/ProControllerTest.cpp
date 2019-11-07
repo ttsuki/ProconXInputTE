@@ -12,7 +12,8 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		constexpr int StatusLines = 6;
+		constexpr int StatusLines = 7;
+
 		void RunProconTest()
 		{
 			using namespace ProControllerHid;
@@ -46,12 +47,13 @@ namespace ProconXInputTE
 						| s.Buttons.YButton << 3;
 
 					std::string line(index * StatusLines, '\n');
-					InputStatusString st = s;
-					
+					InputStatusString st = InputStatusString(s, controller->CorrectInput(s));
+
 					line += "\x1b[2K" "---- Controller " + std::to_string(index) + "\n";
-					line += "\x1b[2K" "  > Clock=" + st.GetClockString() + " Report="+st.GetRawDataString() + "\n";
+					line += "\x1b[2K" "  > Clock=" + st.GetClockString() + " Report=" + st.GetRawDataString() + "\n";
 					line += "\x1b[2K" "  > " + st.GetParsedInput() + "\n";
 					line += "\x1b[2K" "  > " + st.GetParsedImu() + "\n";
+					line += "\x1b[2K" "  > " + st.GetCorrectedInput() + "/" + st.GetCorrectedImu() + "\n";
 
 					line += "\x1b[2K" "  > Vibration Test (L/R Button): ";
 					line += " lf/la=" + std::to_string(lf) + "/" + std::to_string(la);
