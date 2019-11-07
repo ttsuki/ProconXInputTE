@@ -133,7 +133,8 @@ namespace ProControllerHid
 		SendUsbCommand(0x02, {}, true); // Handshake
 		SendUsbCommand(0x04, {}, false); // HID only-mode(No use Bluetooth)
 
-		SendSubCommand(0x40, {0x00}, true); // disable imuData
+		SendSubCommand(0x03, {0x30}, true); // Set input report mode
+		SendSubCommand(0x40, {0x01}, true); // enable imuData
 		SendSubCommand(0x48, {0x01}, true); // enable Rumble
 		SendSubCommand(0x38, {0x2F, 0x10, 0x11, 0x33, 0x33}, true); // Set HOME Light animation
 		SendSubCommand(0x30, {playerLedStatus_}, true); // Set Player LED Status
@@ -327,6 +328,12 @@ namespace ProControllerHid
 		status.LeftStick = lStick.status;
 		status.RightStick = rStick.status;
 		status.Buttons = buttons.status;
+
+		if (data[0] == 0x30)
+		{
+			memcpy(&status.Gyroscope, &data[19], 6);
+			memcpy(&status.Accelerometer, &data[13], 6);
+		}
 
 		{
 			std::lock_guard<decltype(statusCallbackCalling_)> lock(statusCallbackCalling_);
