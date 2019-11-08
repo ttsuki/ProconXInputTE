@@ -12,7 +12,7 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		template <class U, class T, std::enable_if_t<std::is_trivially_copyable_v<T>, U> = 0>
+		template <class U, class T, std::enable_if_t<std::is_trivially_copyable_v<T>, U>  = 0>
 		inline static U AsRawInt(T t)
 		{
 			union
@@ -53,8 +53,8 @@ namespace ProconXInputTE
 				AsRawInt<uint32_t>(input.LeftStick),
 				AsRawInt<uint32_t>(input.RightStick),
 				AsRawInt<uint32_t>(input.Buttons),
-				AsRawInt<uint64_t>(input.Accelerometer),
-				AsRawInt<uint64_t>(input.Gyroscope)
+				AsRawInt<uint64_t>(input.Sensors[0].Accelerometer),
+				AsRawInt<uint64_t>(input.Sensors[0].Gyroscope)
 			);
 			return str;
 		}
@@ -98,10 +98,11 @@ namespace ProconXInputTE
 		std::string InputStatusString::GetParsedImu() const
 		{
 			char str[256];
+			const auto &sensor = input.Sensors[0];
 			snprintf(str, sizeof(str),
 				"Imu: Acl(%4d,%4d,%4d)/Gyr(%4d,%4d,%4d)",
-				input.Accelerometer.X, input.Accelerometer.Y, input.Accelerometer.Z,
-				input.Gyroscope.X, input.Gyroscope.Y, input.Gyroscope.Z);
+				sensor.Accelerometer.X, sensor.Accelerometer.Y, sensor.Accelerometer.Z,
+				sensor.Gyroscope.X, sensor.Gyroscope.Y, sensor.Gyroscope.Z);
 			return str;
 		}
 
@@ -119,10 +120,11 @@ namespace ProconXInputTE
 		std::string InputStatusString::GetCorrectedImu() const
 		{
 			char str[256];
+			const auto &sensor = corrected.Sensors[0];
 			snprintf(str, sizeof(str),
 				"Imu: Acl(%+.4f,%+.4f,%+.4f)/Gyr(%+.4f,%+.4f,%+.4f)",
-				corrected.Accelerometer.X, corrected.Accelerometer.Y, corrected.Accelerometer.Z,
-				corrected.Gyroscope.X, corrected.Gyroscope.Y, corrected.Gyroscope.Z);
+				sensor.Accelerometer.X, sensor.Accelerometer.Y, sensor.Accelerometer.Z,
+				sensor.Gyroscope.X, sensor.Gyroscope.Y, sensor.Gyroscope.Z);
 			return str;
 		}
 

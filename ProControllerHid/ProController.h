@@ -57,38 +57,50 @@ namespace ProControllerHid
 
 	struct SensorStatus
 	{
-		int16_t X, Y, Z;
+		struct Vector3i
+		{
+			int16_t X, Y, Z;
+		};
+
+		Vector3i Accelerometer;
+		Vector3i Gyroscope;
 	};
 
 	struct InputStatus
 	{
 		uint64_t clock;
+
 		StickStatus LeftStick;
 		StickStatus RightStick;
 		ButtonStatus Buttons;
-		SensorStatus Accelerometer;
-		SensorStatus Gyroscope;
+		bool HasSensorStatus;
+		SensorStatus Sensors[3];
+	};
+
+	struct NormalizedStickStatus
+	{
+		float X, Y;
+	};
+
+	struct NormalizedSensorStatus
+	{
+		struct Vector3f
+		{
+			float X, Y, Z;
+		};
+
+		Vector3f Accelerometer;
+		Vector3f Gyroscope;
 	};
 
 	struct CorrectedInputStatus
 	{
 		uint64_t clock;
-
-		struct StickStatus
-		{
-			float X, Y;
-		};
-
-		struct SensorStatus
-		{
-			float X, Y, Z;
-		};
-
-		StickStatus LeftStick;
-		StickStatus RightStick;
+		NormalizedStickStatus LeftStick;
+		NormalizedStickStatus RightStick;
 		ButtonStatus Buttons;
-		SensorStatus Accelerometer;
-		SensorStatus Gyroscope;
+		bool HasSensorStatus;
+		NormalizedSensorStatus Sensors[3];
 	};
 
 	class ProController : public ControllerDevice

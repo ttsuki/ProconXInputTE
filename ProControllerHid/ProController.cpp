@@ -36,6 +36,7 @@ namespace ProControllerHid
 		using PacketProc = std::function<void(const Buffer &)>;
 
 		HidIo::HidDeviceThreaded device_{};
+		bool imuSensorsEnabled_{};
 
 		uint8_t nextPacketNumber_{};
 		Buffer rumbleStatus_{};
@@ -82,7 +83,7 @@ namespace ProControllerHid
 
 				int16_t DeadZone, RangeRatio;
 			} LeftStick, RightStick;
-		} calibrationParameters_;
+		} calibrationParameters_{};
 
 	public:
 		ProControllerImpl(const char *pathToDevice, int index,
@@ -102,7 +103,7 @@ namespace ProControllerHid
 	private:
 		SpiCalibrationParameters LoadCalibrationParametersFromSpiMemory();
 		void SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck);
-		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, PacketProc callback = nullptr);
+		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, const PacketProc &callback = nullptr);
 		Buffer ReadSpiMemory(uint16_t address, uint8_t length);
 		void SendRumble();
 
@@ -154,6 +155,8 @@ namespace ProControllerHid
 		const char *pathToDevice, int index,
 		std::function<void(const InputStatus &status)> statusCallback)
 	{
+		imuSensorsEnabled_ = true;
+
 		SetRumbleBasic(0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80);
 		SetPlayerLed((1 << index) - 1);
 
@@ -171,7 +174,7 @@ namespace ProControllerHid
 		calibrationParameters_ = LoadCalibrationParametersFromSpiMemory();
 
 		SendSubCommand(0x03, {0x30}, true); // Set input report mode
-		SendSubCommand(0x40, {0x01}, true); // enable imuData
+		SendSubCommand(0x40, {static_cast<uint8_t>(imuSensorsEnabled_ ? 0x01 : 0x00)}, true); // enable/disable imuData
 		SendSubCommand(0x48, {0x01}, true); // enable Rumble
 		SendSubCommand(0x38, {0x2F, 0x10, 0x11, 0x33, 0x33}, true); // Set HOME Light animation
 		SendSubCommand(0x30, {playerLedStatus_}, true); // Set Player LED Status
@@ -244,42 +247,50 @@ namespace ProControllerHid
 
 	CorrectedInputStatus ProControllerImpl::CorrectInput(const InputStatus &raw)
 	{
-		auto applyAccel = [](SpiCalibrationParameters::SensorCalibration::Axis a, int16_t value)
+		const auto correctStick = [](SpiCalibrationParameters::StickCalibration a, SpiCalibrationParameters::StickCalibration::Range r, int16_t value)
 		{
-			//if (abs(value) < 205) { return 0.0f; }
-			return value * 4.0f / static_cast<float>(a.Sensitivity - a.Origin);
-		};
-
-		auto applyGyro = [](SpiCalibrationParameters::SensorCalibration::Axis a, int16_t value)
-		{
-			//if (abs(value - a.Origin) < 75) { return 0.0f; }
-			return (value - a.Origin) * 0.0027777778f * 936.0f / (a.Sensitivity - a.Origin);
-		};
-
-		auto applyStick = [](SpiCalibrationParameters::StickCalibration a, SpiCalibrationParameters::StickCalibration::Range r, int16_t value)
-		{
-			int upperLower = r.CenterValue + a.DeadZone;
-			int lowerUpper = r.CenterValue - a.DeadZone;
+			const int upperLower = r.CenterValue + a.DeadZone;
+			const int lowerUpper = r.CenterValue - a.DeadZone;
 			float f{};
-			if (value >= upperLower) { f = static_cast<float>(value - upperLower) / (r.MaxValue - upperLower); }
-			else if (value <= lowerUpper) { f = -static_cast<float>(value - lowerUpper) / (r.MinValue - lowerUpper); }
+			if (value >= upperLower) { f = static_cast<float>(value - upperLower) / static_cast<float>(r.MaxValue - upperLower); }
+			else if (value <= lowerUpper) { f = -static_cast<float>(value - lowerUpper) / static_cast<float>(r.MinValue - lowerUpper); }
 			else f = 0.0f;
 			return std::min(std::max(f, -1.0f), 1.0f);
 		};
 
 		CorrectedInputStatus result{};
-		result.LeftStick.X = applyStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.X, raw.LeftStick.AxisX);
-		result.LeftStick.Y = applyStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.Y, raw.LeftStick.AxisY);
-		result.RightStick.X = applyStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.X, raw.RightStick.AxisX);
-		result.RightStick.Y = applyStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.Y, raw.RightStick.AxisY);
+		result.clock = raw.clock;
+		result.LeftStick.X = correctStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.X, raw.LeftStick.AxisX);
+		result.LeftStick.Y = correctStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.Y, raw.LeftStick.AxisY);
+		result.RightStick.X = correctStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.X, raw.RightStick.AxisX);
+		result.RightStick.Y = correctStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.Y, raw.RightStick.AxisY);
 		result.Buttons = raw.Buttons;
-		result.Accelerometer.X = applyAccel(calibrationParameters_.Accelerometer.X, raw.Accelerometer.X);
-		result.Accelerometer.Y = applyAccel(calibrationParameters_.Accelerometer.Y, raw.Accelerometer.Y);
-		result.Accelerometer.Z = applyAccel(calibrationParameters_.Accelerometer.Z, raw.Accelerometer.Z);
-		result.Gyroscope.X = applyGyro(calibrationParameters_.Gyroscope.X, raw.Gyroscope.X);
-		result.Gyroscope.Y = applyGyro(calibrationParameters_.Gyroscope.Y, raw.Gyroscope.Y);
-		result.Gyroscope.Z = applyGyro(calibrationParameters_.Gyroscope.Z, raw.Gyroscope.Z);
 
+		result.HasSensorStatus = raw.HasSensorStatus;
+		if (raw.HasSensorStatus)
+		{
+			const auto correctAccelerometer = [](SpiCalibrationParameters::SensorCalibration::Axis a, int16_t value)
+			{
+				//if (abs(value) < 205) { return 0.0f; }
+				return static_cast<float>(value * 4.0 / (a.Sensitivity - a.Origin));
+			};
+
+			const auto correctGyroscope = [](SpiCalibrationParameters::SensorCalibration::Axis a, int16_t value)
+			{
+				//if (abs(value - a.Origin) < 75) { return 0.0f; }
+				return static_cast<float>((value - a.Origin) * 0.0027777778 * 936.0 / (a.Sensitivity - a.Origin));
+			};
+
+			for (int i = 0; i < 3; i++)
+			{
+				result.Sensors[i].Accelerometer.X = correctAccelerometer(calibrationParameters_.Accelerometer.X, raw.Sensors[i].Accelerometer.X);
+				result.Sensors[i].Accelerometer.Y = correctAccelerometer(calibrationParameters_.Accelerometer.Y, raw.Sensors[i].Accelerometer.Y);
+				result.Sensors[i].Accelerometer.Z = correctAccelerometer(calibrationParameters_.Accelerometer.Z, raw.Sensors[i].Accelerometer.Z);
+				result.Sensors[i].Gyroscope.X = correctGyroscope(calibrationParameters_.Gyroscope.X, raw.Sensors[i].Gyroscope.X);
+				result.Sensors[i].Gyroscope.Y = correctGyroscope(calibrationParameters_.Gyroscope.Y, raw.Sensors[i].Gyroscope.Y);
+				result.Sensors[i].Gyroscope.Z = correctGyroscope(calibrationParameters_.Gyroscope.Z, raw.Sensors[i].Gyroscope.Z);
+			}
+		}
 		return result;
 	}
 
@@ -409,7 +420,7 @@ namespace ProControllerHid
 		}
 	}
 
-	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, PacketProc callback)
+	void ProControllerImpl::SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, const PacketProc &callback)
 	{
 		Buffer buf = {
 			0x01, // SubCommand
@@ -520,10 +531,10 @@ namespace ProControllerHid
 		status.RightStick = rStick.status;
 		status.Buttons = buttons.status;
 
-		if (data[0] == 0x30)
+		status.HasSensorStatus = imuSensorsEnabled_ && data[0] == 0x30;
+		if (status.HasSensorStatus)
 		{
-			memcpy(&status.Gyroscope, &data[19], 6);
-			memcpy(&status.Accelerometer, &data[13], 6);
+			memcpy(status.Sensors, &data[13], 12 * 3);
 		}
 
 		{
