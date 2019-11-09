@@ -28,6 +28,12 @@ See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
 
 ---
 
+# For developpers
+
+Also you can use this project as a Nintendo Switch Pro controller :video_game: user mode driver SDK.  
+This drivers supported 6-axis accelerometer/gyroscope sensor inputs (but disabled for XInput).  
+See the `ProControllerHid` project directory and [a test code](/ProconXInputTE/Tests/ProControllerTest.cpp).  
+
 ## Build Environment
  - Visual Studio 2019
 
@@ -46,4 +52,5 @@ See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
 
 ---
 ## License
- MIT
+ MIT (C) 2019 ttsuki  
+ https://github.com/ttsuki/ProconXInputTE/  
