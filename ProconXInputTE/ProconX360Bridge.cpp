@@ -57,6 +57,18 @@ namespace ProconXInputTE
 		return lastInput_;
 	}
 
+	std::pair<uint64_t, ProControllerHid::CorrectedInputStatus> ProconX360Bridge::GetLastInputCorrected() const
+	{
+		std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
+		return lastInputCorrected_;
+	}
+
+	std::pair<uint64_t, ViGEm::X360InputStatus> ProconX360Bridge::GetLastInputSent() const
+	{
+		std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
+		return lastInputSent_;
+	}
+
 	std::pair<uint64_t, ViGEm::X360OutputStatus> ProconX360Bridge::GetLastOutputIn() const
 	{
 		std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
@@ -79,40 +91,43 @@ namespace ProconXInputTE
 
 	void ProconX360Bridge::HandleControllerInput(const InputStatus &inputStatus)
 	{
+		const auto corrected = controller_->CorrectInput(inputStatus);
 		ViGEm::X360InputStatus status =
 		{
 			{
-				inputStatus.Buttons.UpButton,
-				inputStatus.Buttons.DownButton,
-				inputStatus.Buttons.LeftButton,
-				inputStatus.Buttons.RightButton,
-				inputStatus.Buttons.PlusButton,
-				inputStatus.Buttons.MinusButton,
-				inputStatus.Buttons.LStick,
-				inputStatus.Buttons.RStick,
-				inputStatus.Buttons.LButton,
-				inputStatus.Buttons.RButton,
-				inputStatus.Buttons.HomeButton,
+				corrected.Buttons.UpButton,
+				corrected.Buttons.DownButton,
+				corrected.Buttons.LeftButton,
+				corrected.Buttons.RightButton,
+				corrected.Buttons.PlusButton,
+				corrected.Buttons.MinusButton,
+				corrected.Buttons.LStick,
+				corrected.Buttons.RStick,
+				corrected.Buttons.LButton,
+				corrected.Buttons.RButton,
+				corrected.Buttons.HomeButton,
 				false,
-				inputStatus.Buttons.AButton,
-				inputStatus.Buttons.BButton,
-				inputStatus.Buttons.XButton,
-				inputStatus.Buttons.YButton,
+				corrected.Buttons.AButton,
+				corrected.Buttons.BButton,
+				corrected.Buttons.XButton,
+				corrected.Buttons.YButton,
 
-				static_cast<uint8_t>(inputStatus.Buttons.LZButton ? 255 : 0),
-				static_cast<uint8_t>(inputStatus.Buttons.RZButton ? 255 : 0),
+				static_cast<uint8_t>(corrected.Buttons.LZButton ? 255 : 0),
+				static_cast<uint8_t>(corrected.Buttons.RZButton ? 255 : 0),
 			},
-
-			(static_cast<int16_t>(inputStatus.LeftStick.AxisX) << 4) - 32767,
-			(static_cast<int16_t>(inputStatus.LeftStick.AxisY) << 4) - 32767,
-			(static_cast<int16_t>(inputStatus.RightStick.AxisX) << 4) - 32767,
-			(static_cast<int16_t>(inputStatus.RightStick.AxisY) << 4) - 32767,
+			static_cast<int16_t>(corrected.LeftStick.X * 32767),
+			static_cast<int16_t>(corrected.LeftStick.Y * 32767),
+			static_cast<int16_t>(corrected.RightStick.X * 32767),
+			static_cast<int16_t>(corrected.RightStick.Y * 32767),
 		};
 		x360_->Report(status);
 
 		{
+			auto timestamp = GetCurrentTimestamp();
 			std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
-			lastInput_ = {GetCurrentTimestamp(), inputStatus};
+			lastInput_ = {timestamp, inputStatus};
+			lastInputCorrected_ = {timestamp, corrected};
+			lastInputSent_ = {timestamp, status};
 		}
 	}
 
@@ -121,24 +136,16 @@ namespace ProconXInputTE
 		auto clock = std::chrono::steady_clock::now();
 		while (rumbleControlThreadRunning_.test_and_set())
 		{
-			largeMoterAmplification_.first = std::max<int>(
-				largeMoterAmplification_.first - largeRumbleParam.Left.DecaySpeed, 0);
-			smallMoterAmplification_.first = std::max<int>(
-				smallMoterAmplification_.first - smallRumbleParam.Left.DecaySpeed, 0);
-			largeMoterAmplification_.second = std::max<int>(
-				largeMoterAmplification_.second - largeRumbleParam.Right.DecaySpeed, 0);
-			smallMoterAmplification_.second = std::max<int>(
-				smallMoterAmplification_.second - smallRumbleParam.Right.DecaySpeed, 0);
+			largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first - largeRumbleParam.Left.DecaySpeed, 0);
+			smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first - smallRumbleParam.Left.DecaySpeed, 0);
+			largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second - largeRumbleParam.Right.DecaySpeed, 0);
+			smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second - smallRumbleParam.Right.DecaySpeed, 0);
 			{
 				std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
-				largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first,
-					lastOutput_.second.largeRumble);
-				smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first,
-					lastOutput_.second.smallRumble);
-				largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second,
-					lastOutput_.second.largeRumble);
-				smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second,
-					lastOutput_.second.smallRumble);
+				largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first, lastOutput_.second.largeRumble);
+				smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first, lastOutput_.second.smallRumble);
+				largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second, lastOutput_.second.largeRumble);
+				smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second, lastOutput_.second.smallRumble);
 			}
 
 			controller_->SetRumbleBasic(

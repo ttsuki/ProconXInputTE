@@ -80,6 +80,7 @@ namespace ProconXInputTE
 						for (auto &&b : bridges)
 						{
 							auto input = b->GetLastInput().second;
+							auto corrected = b->GetLastInputCorrected().second;
 							auto outputIn = b->GetLastOutputIn().second;
 							auto outputOut = b->GetLastOutputOut().second;
 							message << "\x1b[2K";
@@ -91,7 +92,7 @@ namespace ProconXInputTE
 							message << " H:"
 								<< std::setw(3) << static_cast<int>(outputOut.smallRumble) << "/"
 								<< std::setw(3) << static_cast<int>(outputIn.smallRumble);
-							message << "  In " << InputStatusString(input).GetParsedInput();
+							message << "  In " << InputStatusString(input, corrected).GetCorrectedInput();
 							message << "\n";
 						}
 

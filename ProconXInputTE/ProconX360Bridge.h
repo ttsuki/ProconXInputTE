@@ -28,6 +28,8 @@ namespace ProconXInputTE
 		void SetRumbleParameter(RumbleParams largeToLow, RumbleParams smallToHigh);
 		int GetIndex() const { return x360_->GetDeviceIndex(); }
 		std::pair<uint64_t, ProControllerHid::InputStatus> GetLastInput() const;
+		std::pair<uint64_t, ProControllerHid::CorrectedInputStatus> GetLastInputCorrected() const;
+		std::pair<uint64_t, ViGEm::X360InputStatus> GetLastInputSent() const;
 		std::pair<uint64_t, ViGEm::X360OutputStatus> GetLastOutputIn() const;
 		std::pair<uint64_t, ViGEm::X360OutputStatus> GetLastOutputOut() const;
 
@@ -37,6 +39,8 @@ namespace ProconXInputTE
 		std::unique_ptr<ViGEm::X360Controller> x360_{};
 
 		std::pair<int64_t, ProControllerHid::InputStatus> lastInput_{};
+		std::pair<int64_t, ProControllerHid::CorrectedInputStatus> lastInputCorrected_{};
+		std::pair<int64_t, ViGEm::X360InputStatus> lastInputSent_{};
 		std::pair<int64_t, ViGEm::X360OutputStatus> lastOutput_{};
 		std::pair<int64_t, ViGEm::X360OutputStatus> lastOutputOut_{};
 
