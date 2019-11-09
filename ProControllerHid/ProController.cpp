@@ -37,6 +37,8 @@ namespace ProControllerHid
 		using Clock = std::chrono::steady_clock;
 
 		HidIo::HidDeviceThreaded device_{};
+
+		std::string devicePath_{};
 		bool imuSensorsEnabled_{};
 
 		uint8_t nextPacketNumber_{};
@@ -87,7 +89,7 @@ namespace ProControllerHid
 		} calibrationParameters_{};
 
 	public:
-		ProControllerImpl(const char *pathToDevice, int index, InputStatusCallback statusCallback);
+		ProControllerImpl(const char *pathToDevice, int index, InputStatusCallback statusCallback, bool imuSensorEnabled);
 		~ProControllerImpl() override;
 
 		void StartStatusCallback() override;
@@ -103,7 +105,7 @@ namespace ProControllerHid
 	private:
 		SpiCalibrationParameters LoadCalibrationParametersFromSpiMemory();
 		void SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck);
-		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, const PacketProc &callback = nullptr);
+		void SendSubCommand(uint8_t subCommand, const Buffer& data, bool waitAck, const PacketProc& callback = nullptr);
 		Buffer ReadSpiMemory(uint16_t address, uint8_t length);
 		void SendRumble();
 
@@ -151,10 +153,11 @@ namespace ProControllerHid
 			|| pending_.count(command) == 0;
 	}
 
-	ProControllerImpl::ProControllerImpl(const char *pathToDevice, int index, InputStatusCallback statusCallback)
+	ProControllerImpl::ProControllerImpl(const char *pathToDevice, int index, InputStatusCallback statusCallback, bool imuSensorEnabled = false)
+		: devicePath_(pathToDevice)
+		, imuSensorsEnabled_(imuSensorEnabled)
+		, statusCallback_(std::move(statusCallback))
 	{
-		imuSensorsEnabled_ = true;
-
 		SetRumbleBasic(0, 0, 0, 0, 0x80, 0x80, 0x80, 0x80);
 		SetPlayerLed((1 << index) - 1);
 
@@ -176,8 +179,6 @@ namespace ProControllerHid
 		SendSubCommand(0x48, {0x01}, true); // enable Rumble
 		SendSubCommand(0x38, {0x2F, 0x10, 0x11, 0x33, 0x33}, true); // Set HOME Light animation
 		SendSubCommand(0x30, {playerLedStatus_}, true); // Set Player LED Status
-
-		statusCallback_ = std::move(statusCallback);
 
 		controllerUpdaterThreadRunning_.test_and_set();
 		controllerUpdaterThread_ = std::thread([this, threadName = std::string(pathToDevice) + "-UpdaterThread"]
@@ -544,9 +545,9 @@ namespace ProControllerHid
 		}
 	}
 
-	std::unique_ptr<ProController> ProController::Connect(const char *pathToDevice, int index, InputStatusCallback statusCallback)
+	std::unique_ptr<ProController> ProController::Connect(const char *pathToDevice, int index, InputStatusCallback statusCallback, bool imuSensorEnabled)
 	{
-		return std::make_unique<ProControllerImpl>(pathToDevice, index, std::move(statusCallback));
+		return std::make_unique<ProControllerImpl>(pathToDevice, index, std::move(statusCallback), imuSensorEnabled);
 	}
 
 	std::vector<std::string> ProController::EnumerateProControllerDevicePaths()

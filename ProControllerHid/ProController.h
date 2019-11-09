@@ -122,7 +122,7 @@ namespace ProControllerHid
 		virtual void SetPlayerLed(uint8_t playerLed) = 0;
 
 		using InputStatusCallback = std::function<void(const InputStatus &status)>;
-		static std::unique_ptr<ProController> Connect(const char *pathToDevice, int index, InputStatusCallback statusCallback);
+		static std::unique_ptr<ProController> Connect(const char *pathToDevice, int index, InputStatusCallback statusCallback, bool imuSensorEnabled = false);
 
 		static std::vector<std::string> EnumerateProControllerDevicePaths();
 	};

@@ -88,7 +88,7 @@ namespace ProconXInputTE
 					controller->SetPlayerLed(led);
 				};
 
-				controllers.emplace_back(ProController::Connect(devPath.c_str(), index + 1, callback));
+				controllers.emplace_back(ProController::Connect(devPath.c_str(), index + 1, callback, true));
 				index++;
 			}
 
