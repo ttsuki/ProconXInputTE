@@ -15,6 +15,7 @@
 #  include <SetupAPI.h>
 #  include <hidsdi.h>
 #  pragma comment(lib,"hid.lib")
+#  pragma comment(lib,"setupapi.lib")
 #endif
 
 
