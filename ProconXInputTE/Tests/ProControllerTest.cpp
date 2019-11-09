@@ -12,7 +12,7 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		constexpr int StatusLines = 7;
+		constexpr int StatusLines = 8;
 
 		void RunProconTest()
 		{
@@ -50,17 +50,18 @@ namespace ProconXInputTE
 					InputStatusString st = InputStatusString(s, controller->CorrectInput(s));
 
 					line += "\x1b[2K" "---- Controller " + std::to_string(index) + "\n";
-					line += "\x1b[2K" "  > Clock=" + st.GetClockString() + " Report=" + st.GetRawDataString() + "\n";
-					line += "\x1b[2K" "  > " + st.GetParsedInput() + "\n";
-					line += "\x1b[2K" "  > " + st.GetParsedImu() + "\n";
-					line += "\x1b[2K" "  > " + st.GetCorrectedInput() + "/" + st.GetCorrectedImu() + "\n";
+					line += "\x1b[2K" "  Input > Clock=" + st.GetClockString() + " Report=" + st.GetRawDataString() + "\n";
+					line += "\x1b[2K" "  - Parsed > " + st.GetParsedInput() + "\n";
+					line += "\x1b[2K" "  - Parsed > " + st.GetParsedImu() + "\n";
+					line += "\x1b[2K" "  - Corrected > " + st.GetCorrectedInput() + "\n";
+					line += "\x1b[2K" "  - Corrected > " + st.GetCorrectedImu() + "\n";
 
-					line += "\x1b[2K" "  > Vibration Test (L/R Button): ";
+					line += "\x1b[2K" "  Output > Vibration Test (L/R Button): ";
 					line += " lf/la=" + std::to_string(lf) + "/" + std::to_string(la);
 					line += " hf/ha=" + std::to_string(hf) + "/" + std::to_string(ha);
 					line += "\n";
 
-					line += "\x1b[2K" "  > LED Test (ABXY Button): ";
+					line += "\x1b[2K" "  Output > LED Test (ABXY Button): ";
 					line += led & 1 ? "*" : "_";
 					line += led & 2 ? "*" : "_";
 					line += led & 4 ? "*" : "_";

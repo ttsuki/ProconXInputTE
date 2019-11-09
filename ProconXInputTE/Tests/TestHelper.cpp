@@ -110,10 +110,33 @@ namespace ProconXInputTE
 		{
 			char str[256];
 			snprintf(str, sizeof(str),
-				"L(%+.3f,%+.3f),R(%+.3f,%+.3f)",
+				"L(%+.3f,%+.3f),R(%+.3f,%+.3f)"
+				",Buttons:%s%s%s%s%s%s%s%s"
+				"%s%s%s%s%s%s"
+				"%s%s%s%s", 
 				corrected.LeftStick.X, corrected.LeftStick.Y,
-				corrected.RightStick.X, corrected.RightStick.Y
-			);
+				corrected.RightStick.X, corrected.RightStick.Y,
+
+				input.Buttons.UpButton ? "U" : "",
+				input.Buttons.DownButton ? "D" : "",
+				input.Buttons.LeftButton ? "L" : "",
+				input.Buttons.RightButton ? "R" : "",
+				input.Buttons.AButton ? "A" : "",
+				input.Buttons.BButton ? "B" : "",
+				input.Buttons.XButton ? "X" : "",
+				input.Buttons.YButton ? "Y" : "",
+
+				input.Buttons.LButton ? "L" : "",
+				input.Buttons.RButton ? "R" : "",
+				input.Buttons.LZButton ? "Lz" : "",
+				input.Buttons.RZButton ? "Rz" : "",
+				input.Buttons.LStick ? "Ls" : "",
+				input.Buttons.RStick ? "Rs" : "",
+
+				input.Buttons.PlusButton ? "+" : "",
+				input.Buttons.MinusButton ? "-" : "",
+				input.Buttons.HomeButton ? "H" : "",
+				input.Buttons.ShareButton ? "S" : "");
 			return str;
 		}
 
