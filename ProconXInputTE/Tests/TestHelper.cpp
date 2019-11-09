@@ -12,43 +12,61 @@ namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		template <class T, std::enable_if_t<std::is_trivially_copyable_v<T>, int>  = 0>
-		inline static int AsRaw32bit(T t)
+		template <class U, class T, std::enable_if_t<std::is_trivially_copyable_v<T>, U>  = 0>
+		inline static U AsRawInt(T t)
 		{
 			union
 			{
 				T t_;
-				int i_;
+				U i_;
 			} x{t};
 			return x.i_;
 		}
 
-		std::string StatusString(
-			const ProControllerHid::InputStatus &input,
-			bool withClock, bool withRaw)
+		InputStatusString::InputStatusString(const ProControllerHid::InputStatus &input)
+			: input(input)
 		{
-			char clockStr[32];
-			snprintf(clockStr, sizeof(clockStr),
-				"%lld:",
+		}
+
+		InputStatusString::InputStatusString(
+			const ProControllerHid::InputStatus &input,
+			const ProControllerHid::CorrectedInputStatus corrected)
+			: input(input)
+			, corrected(corrected)
+		{
+		}
+
+		std::string InputStatusString::GetClockString() const
+		{
+			char str[32];
+			snprintf(str, sizeof(str),
+				"%lld",
 				input.clock);
+			return str;
+		}
 
-			char rawInputStr[32];
-			snprintf(rawInputStr, sizeof(rawInputStr),
-				"0x%06X,0x%06X,0x%06X:",
-				AsRaw32bit(input.LeftStick),
-				AsRaw32bit(input.RightStick),
-				AsRaw32bit(input.Buttons)
+		std::string InputStatusString::GetRawDataString() const
+		{
+			char str[64];
+			snprintf(str, sizeof(str),
+				"%06X,%06X,%06X,%012llX,%012llX",
+				AsRawInt<uint32_t>(input.LeftStick),
+				AsRawInt<uint32_t>(input.RightStick),
+				AsRawInt<uint32_t>(input.Buttons),
+				AsRawInt<uint64_t>(input.Sensors[0].Accelerometer),
+				AsRawInt<uint64_t>(input.Sensors[0].Gyroscope)
 			);
+			return str;
+		}
 
-			char statusText[256];
-			snprintf(statusText, sizeof(statusText),
-				"%s%s"
-				"L(%4d,%4d),R(%4d,%4d)"
-				",D:%s%s%s%s%s%s%s%s"
+		std::string InputStatusString::GetParsedInput() const
+		{
+			char str[256];
+			snprintf(str, sizeof(str),
+				"L(%4u,%4u),R(%4u,%4u)"
+				",Buttons:%s%s%s%s%s%s%s%s"
 				"%s%s%s%s%s%s"
 				"%s%s%s%s",
-				withClock ? clockStr : "",
-				withRaw ? rawInputStr : "",
 
 				input.LeftStick.AxisX, input.LeftStick.AxisY,
 				input.RightStick.AxisX, input.RightStick.AxisY,
@@ -74,7 +92,40 @@ namespace ProconXInputTE
 				input.Buttons.HomeButton ? "H" : "",
 				input.Buttons.ShareButton ? "S" : ""
 			);
-			return std::string(statusText);
+			return str;
+		}
+
+		std::string InputStatusString::GetParsedImu() const
+		{
+			char str[256];
+			const auto &sensor = input.Sensors[0];
+			snprintf(str, sizeof(str),
+				"Imu: Acl(%4d,%4d,%4d)/Gyr(%4d,%4d,%4d)",
+				sensor.Accelerometer.X, sensor.Accelerometer.Y, sensor.Accelerometer.Z,
+				sensor.Gyroscope.X, sensor.Gyroscope.Y, sensor.Gyroscope.Z);
+			return str;
+		}
+
+		std::string InputStatusString::GetCorrectedInput() const
+		{
+			char str[256];
+			snprintf(str, sizeof(str),
+				"L(%+.3f,%+.3f),R(%+.3f,%+.3f)",
+				corrected.LeftStick.X, corrected.LeftStick.Y,
+				corrected.RightStick.X, corrected.RightStick.Y
+			);
+			return str;
+		}
+
+		std::string InputStatusString::GetCorrectedImu() const
+		{
+			char str[256];
+			const auto &sensor = corrected.Sensors[0];
+			snprintf(str, sizeof(str),
+				"Imu: Acl(%+.4f,%+.4f,%+.4f)/Gyr(%+.4f,%+.4f,%+.4f)",
+				sensor.Accelerometer.X, sensor.Accelerometer.Y, sensor.Accelerometer.Z,
+				sensor.Gyroscope.X, sensor.Gyroscope.Y, sensor.Gyroscope.Z);
+			return str;
 		}
 
 		void SetupConsoleWindow()
@@ -91,7 +142,7 @@ namespace ProconXInputTE
 
 		void WaitEscapeOrCtrlC()
 		{
-			std::cout << "Press Ctrl+C or ESCAPE to exit." << std::endl;
+			std::cout << "Press Ctrl+C or ESCAPE to exit.\n" << std::endl;
 			while (int ch = _getch())
 			{
 				if (ch == 3 || ch == 27) { break; }

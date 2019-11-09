@@ -15,7 +15,7 @@ namespace ProControllerHid
 
 		Buffer& Buffer::operator +=(const Buffer &data)
 		{
-			for (int i = 0; i < data.size(); i++)
+			for (size_t i = 0; i < data.size(); i++)
 			{
 				buffer_[size_ + i] = data[i];
 			}
@@ -203,7 +203,7 @@ namespace ProControllerHid
 			if (!running_) { return 0; }
 
 			senderQueue_.Signal(data);
-			return data.size();
+			return static_cast<int>(data.size());
 		}
 
 		HidDeviceList EnumerateConnectedDevices(unsigned short vendorId, unsigned short productId)

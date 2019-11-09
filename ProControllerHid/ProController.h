@@ -55,12 +55,52 @@ namespace ProControllerHid
 		unsigned padding_ : 8;
 	};
 
+	struct SensorStatus
+	{
+		struct Vector3i
+		{
+			int16_t X, Y, Z;
+		};
+
+		Vector3i Accelerometer;
+		Vector3i Gyroscope;
+	};
+
 	struct InputStatus
 	{
 		uint64_t clock;
+
 		StickStatus LeftStick;
 		StickStatus RightStick;
 		ButtonStatus Buttons;
+		bool HasSensorStatus;
+		SensorStatus Sensors[3];
+	};
+
+	struct NormalizedStickStatus
+	{
+		float X, Y;
+	};
+
+	struct NormalizedSensorStatus
+	{
+		struct Vector3f
+		{
+			float X, Y, Z;
+		};
+
+		Vector3f Accelerometer;
+		Vector3f Gyroscope;
+	};
+
+	struct CorrectedInputStatus
+	{
+		uint64_t clock;
+		NormalizedStickStatus LeftStick;
+		NormalizedStickStatus RightStick;
+		ButtonStatus Buttons;
+		bool HasSensorStatus;
+		NormalizedSensorStatus Sensors[3];
 	};
 
 	class ProController : public ControllerDevice
@@ -73,6 +113,7 @@ namespace ProControllerHid
 
 		virtual void StartStatusCallback() = 0;
 		virtual void StopStatusCallback() = 0;
+		virtual CorrectedInputStatus CorrectInput(const InputStatus &raw) = 0;
 
 		virtual void SetRumbleBasic(
 			uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp = 0x00, uint8_t rightHighAmp = 0x00,
