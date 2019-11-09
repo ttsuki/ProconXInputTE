@@ -105,7 +105,7 @@ namespace ProControllerHid
 	private:
 		SpiCalibrationParameters LoadCalibrationParametersFromSpiMemory();
 		void SendUsbCommand(uint8_t usbCommand, const Buffer &data, bool waitAck);
-		void SendSubCommand(uint8_t subCommand, const Buffer& data, bool waitAck, const PacketProc& callback = nullptr);
+		void SendSubCommand(uint8_t subCommand, const Buffer &data, bool waitAck, const PacketProc &callback = nullptr);
 		Buffer ReadSpiMemory(uint16_t address, uint8_t length);
 		void SendRumble();
 
@@ -246,23 +246,34 @@ namespace ProControllerHid
 
 	CorrectedInputStatus ProControllerImpl::CorrectInput(const InputStatus &raw)
 	{
-		const auto correctStick = [](SpiCalibrationParameters::StickCalibration a, SpiCalibrationParameters::StickCalibration::Range r, int16_t value)
+		const auto correctStick = [](
+			const SpiCalibrationParameters::StickCalibration &a,
+			const StickStatus &value) -> NormalizedStickStatus
 		{
-			const int upperLower = r.CenterValue + a.DeadZone;
-			const int lowerUpper = r.CenterValue - a.DeadZone;
-			float f{};
-			if (value >= upperLower) { f = static_cast<float>(value - upperLower) / static_cast<float>(r.MaxValue - upperLower); }
-			else if (value <= lowerUpper) { f = -static_cast<float>(value - lowerUpper) / static_cast<float>(r.MinValue - lowerUpper); }
-			else f = 0.0f;
-			return std::min(std::max(f, -1.0f), 1.0f);
+			int x = static_cast<int>(value.AxisX) - a.X.CenterValue;
+			int y = static_cast<int>(value.AxisY) - a.Y.CenterValue;
+			if (abs(x) <= a.DeadZone && abs(y) <= a.DeadZone)
+			{
+				return NormalizedStickStatus{};
+			}
+
+			const auto normalize = [](int value, const SpiCalibrationParameters::StickCalibration::Range &r)
+			{
+				const float f = value >= 0
+					? static_cast<float>(value) / static_cast<float>(r.MaxValue - r.CenterValue)
+					: static_cast<float>(-value) / static_cast<float>(r.MinValue - r.CenterValue);
+				return std::min(std::max(f, -1.0f), 1.0f);
+			};
+			NormalizedStickStatus result{};
+			result.X = normalize(x, a.X);
+			result.Y = normalize(y, a.Y);
+			return result;
 		};
 
 		CorrectedInputStatus result{};
 		result.clock = raw.clock;
-		result.LeftStick.X = correctStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.X, raw.LeftStick.AxisX);
-		result.LeftStick.Y = correctStick(calibrationParameters_.LeftStick, calibrationParameters_.LeftStick.Y, raw.LeftStick.AxisY);
-		result.RightStick.X = correctStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.X, raw.RightStick.AxisX);
-		result.RightStick.Y = correctStick(calibrationParameters_.RightStick, calibrationParameters_.RightStick.Y, raw.RightStick.AxisY);
+		result.LeftStick = correctStick(calibrationParameters_.LeftStick, raw.LeftStick);
+		result.RightStick = correctStick(calibrationParameters_.RightStick, raw.RightStick);
 		result.Buttons = raw.Buttons;
 
 		result.HasSensorStatus = raw.HasSensorStatus;
