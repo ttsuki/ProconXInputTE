@@ -140,15 +140,11 @@ namespace ProControllerHid
 				SysDep::SetThreadPriorityToRealtime();
 				while (receiverThreadRunning_.test_and_set())
 				{
-					Buffer data;
+					Buffer data = deviceToReceive_.ReceivePacket(100);
+					if (data.size())
 					{
-						while (true)
-						{
-							data = deviceToReceive_.ReceivePacket(100);
-							if (data.size()) { break; }
-						}
+						receiveQueue_.Signal(data);
 					}
-					receiveQueue_.Signal(data);
 				}
 			});
 
