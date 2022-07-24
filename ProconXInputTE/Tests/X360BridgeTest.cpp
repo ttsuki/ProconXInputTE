@@ -31,13 +31,15 @@ namespace ProconXInputTE
 			SetupConsoleWindow();
 
 			std::cout << "Starting ViGEm Client..." << std::endl;
-			auto client = ViGEmClient::Connect();
-
-			if (!client->IsConnected())
+			std::unique_ptr<ViGEmClient> client;
+			try
 			{
-				std::cout << "Failed to connect ViGEm Bus." << std::endl;
-				std::cout << "Please install ViGEm Bus Driver." << std::endl;
-				std::cout << "Please install ViGEm Bus Driver." << std::endl;
+				client = ViGEm::ConnectToViGEm();
+			}
+			catch (const std::runtime_error &re)
+			{
+				std::cout << "Failed to connect ViGEm Bus. ERROR=" << re.what() << std::endl;
+				std::cout << "Please make sure ViGEm Bus Driver installed." << std::endl;
 				return;
 			}
 
