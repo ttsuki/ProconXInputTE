@@ -84,7 +84,7 @@ namespace ViGEm
 						*reinterpret_cast<XUSB_REPORT*>(&inputStatus));
 				}
 
-				int GetDeviceIndex() const override
+				unsigned long GetDeviceIndex() const override
 				{
 					return vigem_target_get_index(target_);
 				}

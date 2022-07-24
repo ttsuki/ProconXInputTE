@@ -51,7 +51,7 @@ namespace ViGEm
 		X360Controller& operator=(const X360Controller &other) = delete;
 		virtual ~X360Controller() = default;
 		virtual void Report(X360InputStatus inputStatus) = 0;
-		virtual int GetDeviceIndex() const = 0;
+		virtual unsigned long GetDeviceIndex() const = 0;
 		virtual void StartNotification() = 0;
 		virtual void StopNotification() = 0;
 	};
