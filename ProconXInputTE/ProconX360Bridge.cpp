@@ -12,13 +12,11 @@ namespace ProconXInputTE
 
 	ProconX360Bridge::ProconX360Bridge(const char *proConDevicePath, ::ViGEm::ViGEmClient *client)
 	{
-		x360_ = client->AddX360Controller(
-			[this](const X360OutputStatus &x360Output)
-			{
-				HandleControllerOutput(x360Output);
-			});
+		x360_ = client->AddX360Controller();
 
-		controller_ = ProController::Connect(proConDevicePath, x360_->GetDeviceIndex(),
+		controller_ = ProController::Connect(
+			proConDevicePath,
+			static_cast<int>(x360_->GetDeviceIndex()),
 			[this](const InputStatus &proconInput)
 			{
 				HandleControllerInput(proconInput);
@@ -31,7 +29,7 @@ namespace ProconXInputTE
 			RumbleControlTreadBody();
 		});
 
-		x360_->StartNotification();
+		x360_->StartNotification([this](const X360OutputStatus& x360Output) { HandleControllerOutput(x360Output); });
 		controller_->StartStatusCallback();
 	}
 
@@ -120,7 +118,7 @@ namespace ProconXInputTE
 			static_cast<int16_t>(corrected.RightStick.X * 32767),
 			static_cast<int16_t>(corrected.RightStick.Y * 32767),
 		};
-		x360_->Report(status);
+		x360_->SendReport(status);
 
 		{
 			auto timestamp = GetCurrentTimestamp();
