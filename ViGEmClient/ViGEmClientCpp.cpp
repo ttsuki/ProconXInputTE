@@ -7,31 +7,6 @@
 
 namespace ViGEm
 {
-	template <class T, class TValue>
-	class ThreadSafeMap
-	{
-		std::map<T, TValue> map_{};
-		mutable std::mutex mutex_{};
-	public:
-		void Set(const T &key, const TValue &value)
-		{
-			std::lock_guard<decltype(mutex_)> lock_(mutex_);
-			map_[key] = value;
-		}
-
-		TValue& Get(const T &key)
-		{
-			std::lock_guard<decltype(mutex_)> lock_(mutex_);
-			return map_[key];
-		}
-
-		void Del(const T &key)
-		{
-			std::lock_guard<decltype(mutex_)> lock_(mutex_);
-			return map_[key];
-		}
-	};
-
 	class ViGEmClientImpl final : public ViGEmClient, public std::enable_shared_from_this<ViGEmClientImpl>
 	{
 		PVIGEM_CLIENT client_{};
@@ -58,8 +33,6 @@ namespace ViGEm
 		std::unique_ptr<X360Controller> AddX360Controller(
 			std::function<void(const X360OutputStatus &status)> callback) override
 		{
-			class X360ControllerImpl;
-			static ThreadSafeMap<std::pair<PVIGEM_CLIENT, PVIGEM_TARGET>, X360ControllerImpl*> instanceMap;
 			class X360ControllerImpl : public X360Controller
 			{
 				std::function<void(const X360OutputStatus &status)> callback_{};
@@ -68,9 +41,10 @@ namespace ViGEm
 
 				static void __stdcall NotificationCallbackHandler(
 					PVIGEM_CLIENT Client, PVIGEM_TARGET Target,
-					UCHAR LargeMotor, UCHAR SmallMotor, UCHAR LedNumber)
+					UCHAR LargeMotor, UCHAR SmallMotor, UCHAR LedNumber,
+					LPVOID UserData)
 				{
-					if (auto p = instanceMap.Get({Client, Target}))
+					if (auto p = static_cast<X360ControllerImpl*>(UserData))
 					{
 						if (p->callback_)
 						{
@@ -91,7 +65,6 @@ namespace ViGEm
 					, client_(std::move(client))
 					, target_(vigem_target_x360_alloc())
 				{
-					instanceMap.Set({client_->client_, target_}, this);
 					vigem_target_add(client_->client_, target_);
 				}
 
@@ -118,7 +91,7 @@ namespace ViGEm
 
 				void StartNotification() override
 				{
-					vigem_target_x360_register_notification(client_->client_, target_, &NotificationCallbackHandler);
+					vigem_target_x360_register_notification(client_->client_, target_, &NotificationCallbackHandler, this);
 				}
 
 				void StopNotification() override
