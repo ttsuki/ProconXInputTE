@@ -1,111 +1,165 @@
+// ViGEm Client RAII wrapper
+
 #include "ViGEmClientCpp.h"
-#include <wtypes.h>
-#include <map>
+#include <Windows.h>
+
 #include <mutex>
+#include <stdexcept>
 
 #include "ViGEm/Client.h"
 
 namespace ViGEm
 {
-	class ViGEmClientImpl final : public ViGEmClient, public std::enable_shared_from_this<ViGEmClientImpl>
+	using ViGEmClientPtr = std::shared_ptr<std::remove_pointer_t<PVIGEM_CLIENT>>;
+	using ViGEmTargetPtr = std::shared_ptr<std::remove_pointer_t<PVIGEM_TARGET>>;
+
+	struct ViGEmErrorException : std::runtime_error
 	{
-		PVIGEM_CLIENT client_{};
-		VIGEM_ERROR error_{};
-	public:
-		bool IsConnected() const override { return error_ == VIGEM_ERROR_NONE; }
+		VIGEM_ERROR e;
+		explicit ViGEmErrorException(VIGEM_ERROR e) : std::runtime_error(GetErrorMessage(e)), e(e) { }
 
-		ViGEmClientImpl()
+		static const char* GetErrorMessage(VIGEM_ERROR e)
 		{
-			client_ = vigem_alloc();
-			error_ = vigem_connect(client_);
-		}
-
-		~ViGEmClientImpl() override
-		{
-			vigem_free(client_);
-		}
-
-		static std::shared_ptr<ViGEmClient> Connect()
-		{
-			return std::make_shared<ViGEmClientImpl>();
-		}
-
-		std::unique_ptr<X360Controller> AddX360Controller(
-			std::function<void(const X360OutputStatus &status)> callback) override
-		{
-			class X360ControllerImpl : public X360Controller
+			switch (e)
 			{
-				std::function<void(const X360OutputStatus &status)> callback_{};
-				std::shared_ptr<ViGEmClientImpl> client_{};
-				PVIGEM_TARGET target_{};
+			//#define CASE(e) case e: return #e;
+			case VIGEM_ERROR_NONE: return "VIGEM_ERROR_NONE";
+			case VIGEM_ERROR_BUS_NOT_FOUND: return "VIGEM_ERROR_BUS_NOT_FOUND";
+			case VIGEM_ERROR_NO_FREE_SLOT: return "VIGEM_ERROR_NO_FREE_SLOT";
+			case VIGEM_ERROR_INVALID_TARGET: return "VIGEM_ERROR_INVALID_TARGET";
+			case VIGEM_ERROR_REMOVAL_FAILED: return "VIGEM_ERROR_REMOVAL_FAILED";
+			case VIGEM_ERROR_ALREADY_CONNECTED: return "VIGEM_ERROR_ALREADY_CONNECTED";
+			case VIGEM_ERROR_TARGET_UNINITIALIZED: return "VIGEM_ERROR_TARGET_UNINITIALIZED";
+			case VIGEM_ERROR_TARGET_NOT_PLUGGED_IN: return "VIGEM_ERROR_TARGET_NOT_PLUGGED_IN";
+			case VIGEM_ERROR_BUS_VERSION_MISMATCH: return "VIGEM_ERROR_BUS_VERSION_MISMATCH";
+			case VIGEM_ERROR_BUS_ACCESS_FAILED: return "VIGEM_ERROR_BUS_ACCESS_FAILED";
+			case VIGEM_ERROR_CALLBACK_ALREADY_REGISTERED: return "VIGEM_ERROR_CALLBACK_ALREADY_REGISTERED";
+			case VIGEM_ERROR_CALLBACK_NOT_FOUND: return "VIGEM_ERROR_CALLBACK_NOT_FOUND";
+			case VIGEM_ERROR_BUS_ALREADY_CONNECTED: return "VIGEM_ERROR_BUS_ALREADY_CONNECTED";
+			case VIGEM_ERROR_BUS_INVALID_HANDLE: return "VIGEM_ERROR_BUS_INVALID_HANDLE";
+			case VIGEM_ERROR_XUSB_USERINDEX_OUT_OF_RANGE: return "VIGEM_ERROR_XUSB_USERINDEX_OUT_OF_RANGE";
+			case VIGEM_ERROR_INVALID_PARAMETER: return "VIGEM_ERROR_INVALID_PARAMETER";
+			case VIGEM_ERROR_NOT_SUPPORTED: return "VIGEM_ERROR_NOT_SUPPORTED";
+			}
+			return "VIGEM_ERROR_UNKOWN";
+		}
+	};
 
-				static void __stdcall NotificationCallbackHandler(
-					PVIGEM_CLIENT Client, PVIGEM_TARGET Target,
-					UCHAR LargeMotor, UCHAR SmallMotor, UCHAR LedNumber,
-					LPVOID UserData)
-				{
-					if (auto p = static_cast<X360ControllerImpl*>(UserData))
-					{
-						if (p->callback_)
+	static void ThrowOnError(VIGEM_ERROR e)
+	{
+		if (e != VIGEM_ERROR_NONE)
+		{
+			if (IsDebuggerPresent()) DebugBreak();
+			throw ViGEmErrorException(e);
+		}
+	}
+
+	struct ViGEmClientImpl final : public ViGEmClient
+	{
+		ViGEmClientPtr client_;
+
+		struct X360ControllerImpl final : public X360Controller
+		{
+			ViGEmClientPtr client_{};
+			ViGEmTargetPtr target_{};
+
+			std::mutex mutex_{};
+			X360OutputStatus lastOutputStatus_{};
+			X360OutputCallback callback_{};
+
+		public:
+			X360ControllerImpl(ViGEmClientPtr client)
+				: client_(std::move(client))
+				, target_(vigem_target_x360_alloc(), &vigem_target_free)
+			{
+				ThrowOnError(
+					vigem_target_add(client_.get(), target_.get())
+				);
+
+				ThrowOnError(
+					vigem_target_x360_register_notification(
+						client_.get(), target_.get(), [](
+						PVIGEM_CLIENT, PVIGEM_TARGET,
+						UCHAR LargeMotor, UCHAR SmallMotor, UCHAR LedNumber,
+						LPVOID UserData)
 						{
 							X360OutputStatus status{};
 							status.largeRumble = LargeMotor;
 							status.smallRumble = SmallMotor;
 							status.ledNumber = LedNumber;
-							p->callback_(status);
-						}
-					}
-				}
+							static_cast<X360ControllerImpl*>(UserData)->NotificationCallbackProc(status);
+						}, this)
+				);
+			}
 
-			public:
-				X360ControllerImpl(
-					std::shared_ptr<ViGEmClientImpl> client,
-					std::function<void(const X360OutputStatus &status)> callback)
-					: callback_(std::move(callback))
-					, client_(std::move(client))
-					, target_(vigem_target_x360_alloc())
-				{
-					vigem_target_add(client_->client_, target_);
-				}
+			void NotificationCallbackProc(X360OutputStatus output)
+			{
+				std::lock_guard<decltype(mutex_)> lock(mutex_);
+				lastOutputStatus_ = output;
+				if (callback_) callback_(lastOutputStatus_);
+			}
 
-				~X360ControllerImpl() override
-				{
-					vigem_target_x360_unregister_notification(target_);
-					vigem_target_remove(client_->client_, target_);
-					vigem_target_free(target_);
-				}
+			~X360ControllerImpl() override
+			{
+				StopNotification();
+				vigem_target_x360_unregister_notification(target_.get());
+				vigem_target_remove(client_.get(), target_.get());
+			}
 
-				void Report(X360InputStatus inputStatus) override
-				{
-					int x = sizeof(XUSB_REPORT);
-					int y = sizeof(X360InputStatus);
-					static_assert(sizeof(XUSB_REPORT) == sizeof(X360InputStatus), "");
-					vigem_target_x360_update(client_->client_, target_,
-						*reinterpret_cast<XUSB_REPORT*>(&inputStatus));
-				}
+			unsigned long GetDeviceIndex() const override
+			{
+				return vigem_target_get_index(target_.get());
+			}
 
-				unsigned long GetDeviceIndex() const override
-				{
-					return vigem_target_get_index(target_);
-				}
+			void SendReport(X360InputStatus inputStatus) override
+			{
+				static_assert(
+					sizeof(XUSB_REPORT) == sizeof(X360InputStatus) &&
+					std::is_trivial_v<XUSB_REPORT> &&
+					std::is_trivial_v<X360InputStatus>,
+					"type punning check failed.");
+				XUSB_REPORT report{};
+				memcpy(&report, &inputStatus, sizeof(report)); // type punning
 
-				void StartNotification() override
-				{
-					vigem_target_x360_register_notification(client_->client_, target_, &NotificationCallbackHandler, this);
-				}
+				vigem_target_x360_update(client_.get(), target_.get(), report);
+			}
 
-				void StopNotification() override
-				{
-					vigem_target_x360_unregister_notification(target_);
-				}
-			};
+			void ReceiveReport(X360OutputStatus* outputStatus) override
+			{
+				std::lock_guard<decltype(mutex_)> lock(mutex_);
+				*outputStatus = lastOutputStatus_;
+			}
 
-			return std::make_unique<X360ControllerImpl>(shared_from_this(), callback);
+			void StartNotification(X360OutputCallback callback) override
+			{
+				std::lock_guard<decltype(mutex_)> lock(mutex_);
+				callback_ = callback;
+			}
+
+			void StopNotification() override
+			{
+				std::lock_guard<decltype(mutex_)> lock(mutex_);
+				callback_ = nullptr;
+			}
+		};
+
+	public:
+		ViGEmClientImpl()
+			: client_(ViGEmClientPtr(vigem_alloc(), &vigem_free))
+		{
+			ThrowOnError(
+				vigem_connect(client_.get())
+			);
+		}
+
+		std::unique_ptr<X360Controller> AddX360Controller() override
+		{
+			return std::make_unique<X360ControllerImpl>(client_);
 		}
 	};
 
-	std::shared_ptr<ViGEmClient> ViGEmClient::Connect()
+	std::unique_ptr<ViGEmClient> ConnectToViGEm()
 	{
-		return std::make_shared<ViGEmClientImpl>();
+		return std::make_unique<ViGEmClientImpl>();
 	}
 }
