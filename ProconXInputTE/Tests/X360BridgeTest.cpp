@@ -1,3 +1,7 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+
 #include <memory>
 #include <vector>
 #include <string>
@@ -9,8 +13,6 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
-
-#include <Windows.h>
 
 #include <ProControllerHid/ProController.h>
 #include <ViGEmClient/ViGEmClientCpp.h>
@@ -36,7 +38,7 @@ namespace ProconXInputTE
 			{
 				client = ViGEm::ConnectToViGEm();
 			}
-			catch (const std::runtime_error &re)
+			catch (const std::runtime_error& re)
 			{
 				std::cout << "Failed to connect ViGEm Bus. ERROR=" << re.what() << std::endl;
 				std::cout << "Please make sure ViGEm Bus Driver installed." << std::endl;
@@ -45,17 +47,12 @@ namespace ProconXInputTE
 
 			std::cout << "Finding Pro Controllers..." << std::endl;
 			std::vector<std::unique_ptr<ProconX360Bridge>> bridges;
-			for (const auto &devPath : ProController::EnumerateProControllerDevicePaths())
+			for (const auto& devPath : ProController::EnumerateProControllerDevicePaths())
 			{
 				std::cout << "- Device found:" << std::endl;
 				std::cout << "  Path: " << devPath << std::endl;
-				//std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
-				//std::wcout << L"  Product: " << device.product_string << std::endl;
-
 				bridges.emplace_back(std::make_unique<ProconX360Bridge>(devPath.c_str(), client.get()));
-				std::cout << "  Connected as Virtual X360 Controller"
-					<< " index[" << bridges.back()->GetIndex() << "]"
-					<< std::endl;
+				std::cout << "  Connected as Virtual X360 Controller" << " index[" << bridges.back()->GetIndex() << "]" << std::endl;
 			}
 
 			if (bridges.empty())
@@ -69,7 +66,7 @@ namespace ProconXInputTE
 
 			// monitor
 			{
-				std::atomic_flag monitorThreadRunning{ATOMIC_FLAG_INIT};
+				std::atomic_flag monitorThreadRunning{};
 				monitorThreadRunning.test_and_set();
 
 				std::mutex console;
@@ -78,40 +75,43 @@ namespace ProconXInputTE
 					SetThreadDescription(GetCurrentThread(), L"MonitorThread");
 					while (monitorThreadRunning.test_and_set())
 					{
-						std::stringstream message;
-						for (auto &&b : bridges)
+						std::stringstream output;
+
+						for (auto&& b : bridges)
 						{
-							auto input = b->GetLastInput().second;
-							auto corrected = b->GetLastInputCorrected().second;
-							auto outputIn = b->GetLastOutputIn().second;
-							auto outputOut = b->GetLastOutputOut().second;
-							message << "\x1b[2K";
-							message << b->GetIndex() << ">";
-							message << "Fb";
-							message << " L:"
+							auto input = b->GetLastInput().second; // controller input
+							auto outputIn = b->GetLastOutputIn().second; // x360 input value
+							auto outputOut = b->GetLastOutputOut().second; // sent to controller value
+
+							output << "\x1b[2K"; // Clear this lline
+							output << b->GetIndex() << ">";
+							output << "Fb";
+							output << " L:"
 								<< std::setw(3) << static_cast<int>(outputOut.largeRumble) << "/"
 								<< std::setw(3) << static_cast<int>(outputIn.largeRumble);
-							message << " H:"
+							output << " H:"
 								<< std::setw(3) << static_cast<int>(outputOut.smallRumble) << "/"
 								<< std::setw(3) << static_cast<int>(outputIn.smallRumble);
-							message << "  In " << InputStatusString(input, corrected).GetCorrectedInput();
-							message << "\n";
+							output << "  In " << InputStatusAsString(input);
+							output << "\n";
 						}
 
-						for (auto &&b : bridges)
+						for ([[maybe_unused]] auto&& _ : bridges)
 						{
-							message << "\x1b[1A";
+							output << "\x1b[1A";
 						}
-						auto s = message.str();
-						std::cout << s << std::flush;
+
+						std::cout << output.str() << std::flush;
 						std::this_thread::sleep_for(std::chrono::milliseconds(20));
 					}
 				});
+
 				WaitEscapeOrCtrlC();
 
 				monitorThreadRunning.clear();
 				monitorThread.join();
 			}
+
 			std::cout << std::string(bridges.size() + 1, '\n');
 			std::cout << "Closing..." << std::endl;
 			bridges.clear();

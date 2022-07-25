@@ -1,6 +1,6 @@
 #include "ProconX360Bridge.h"
 #include <algorithm>
-#include "ProControllerHid/SysDep.h"
+#include <iostream>
 
 namespace ProconXInputTE
 {
@@ -10,174 +10,122 @@ namespace ProconXInputTE
 	using ViGEm::X360InputStatus;
 	using ViGEm::X360OutputStatus;
 
-	ProconX360Bridge::ProconX360Bridge(const char *proConDevicePath, ::ViGEm::ViGEmClient *client)
+	ProconX360Bridge::ProconX360Bridge(const char* procon_device_path, ::ViGEm::ViGEmClient* client)
 	{
 		x360_ = client->AddX360Controller();
 
 		controller_ = ProController::Connect(
-			proConDevicePath,
-			static_cast<int>(x360_->GetDeviceIndex()),
-			[this](const InputStatus &proconInput)
-			{
-				HandleControllerInput(proconInput);
-			});
+			procon_device_path,
+			false,
+#ifndef NDEBUG
+			[](const char* log) { std::cerr << log << std::endl; }
+#else
+			nullptr
+#endif
+		);
 
-		rumbleControlThreadRunning_.test_and_set();
-		rumbleControlThread_ = std::thread([this, path = std::string(proConDevicePath)]
+		if (!controller_)
+			throw std::runtime_error("Failed to open ProController.");
+
+		controller_->SetPlayerLed(static_cast<uint8_t>(1u << static_cast<int>(x360_->GetDeviceIndex())));
+
+
+		x360_->StartNotification([this](const X360OutputStatus& x360Output)
 		{
-			ProControllerHid::SysDep::SetThreadName((std::string(path) + "-BridgeThread").c_str());
-			RumbleControlTreadBody();
+			lastOutput_ = {GetCurrentTimestamp(), x360Output};
 		});
 
-		x360_->StartNotification([this](const X360OutputStatus& x360Output) { HandleControllerOutput(x360Output); });
-		controller_->StartStatusCallback();
+		controller_->SetInputStatusCallback([this](const InputStatus& input)
+		{
+			X360InputStatus status =
+			{
+				{
+					input.Buttons.UpButton,
+					input.Buttons.DownButton,
+					input.Buttons.LeftButton,
+					input.Buttons.RightButton,
+					input.Buttons.PlusButton,
+					input.Buttons.MinusButton,
+					input.Buttons.LStick,
+					input.Buttons.RStick,
+					input.Buttons.LButton,
+					input.Buttons.RButton,
+					input.Buttons.HomeButton,
+					false,
+					input.Buttons.AButton,
+					input.Buttons.BButton,
+					input.Buttons.XButton,
+					input.Buttons.YButton,
+
+					static_cast<uint8_t>(input.Buttons.LZButton ? 255 : 0),
+					static_cast<uint8_t>(input.Buttons.RZButton ? 255 : 0),
+				},
+				static_cast<int16_t>(input.LeftStick.X * 32767),
+				static_cast<int16_t>(input.LeftStick.Y * 32767),
+				static_cast<int16_t>(input.RightStick.X * 32767),
+				static_cast<int16_t>(input.RightStick.Y * 32767),
+			};
+			x360_->SendReport(status);
+
+			auto timestamp = GetCurrentTimestamp();
+			lastInput_ = {timestamp, input};
+			lastInputSent_ = {timestamp, status};
+		});
+
+		rumble_thread_running_.test_and_set();
+		rumble_thread_ = std::thread([this]
+		{
+			auto clock = std::chrono::steady_clock::now();
+			while (rumble_thread_running_.test_and_set())
+			{
+				large_rumble_value_.first = std::max<int>(large_rumble_value_.first - large_rumble_parameter_.Left.DecaySpeed, 0);
+				small_rumble_value_.first = std::max<int>(small_rumble_value_.first - small_rumble_parameter_.Left.DecaySpeed, 0);
+				large_rumble_value_.second = std::max<int>(large_rumble_value_.second - large_rumble_parameter_.Right.DecaySpeed, 0);
+				small_rumble_value_.second = std::max<int>(small_rumble_value_.second - small_rumble_parameter_.Right.DecaySpeed, 0);
+				{
+					auto o = lastOutput_.load();
+					large_rumble_value_.first = std::max<int>(large_rumble_value_.first, o.second.largeRumble);
+					small_rumble_value_.first = std::max<int>(small_rumble_value_.first, o.second.smallRumble);
+					large_rumble_value_.second = std::max<int>(large_rumble_value_.second, o.second.largeRumble);
+					small_rumble_value_.second = std::max<int>(small_rumble_value_.second, o.second.smallRumble);
+				}
+
+				controller_->SetRumbleBasic(
+					large_rumble_value_.first * large_rumble_parameter_.Left.MaxAmplitude / 255,
+					large_rumble_value_.second * large_rumble_parameter_.Right.MaxAmplitude / 255,
+					small_rumble_value_.first * small_rumble_parameter_.Left.MaxAmplitude / 255,
+					small_rumble_value_.second * small_rumble_parameter_.Right.MaxAmplitude / 255,
+					large_rumble_parameter_.Left.Frequency,
+					large_rumble_parameter_.Right.Frequency,
+					small_rumble_parameter_.Left.Frequency,
+					small_rumble_parameter_.Right.Frequency
+				);
+
+				{
+					lastOutputOut_ = {
+						GetCurrentTimestamp(), {
+							static_cast<uint8_t>(large_rumble_value_.first),
+							static_cast<uint8_t>(small_rumble_value_.first),
+							0
+						}
+					};
+				}
+
+				clock += std::chrono::milliseconds(16);
+				std::this_thread::sleep_until(clock);
+			}
+
+			controller_->SetRumbleBasic(0, 0, 0, 0);
+		});
 	}
 
 	ProconX360Bridge::~ProconX360Bridge()
 	{
-		controller_->StopStatusCallback();
+		controller_->SetInputStatusCallback(nullptr);
 		x360_->StopNotification();
-		rumbleControlThreadRunning_.clear();
-		rumbleControlThread_.join();
+		rumble_thread_running_.clear();
+		rumble_thread_.join();
 		controller_.reset();
 		x360_.reset();
-	}
-
-	void ProconX360Bridge::SetRumbleParameter(RumbleParams largeToLow, RumbleParams smallToHigh)
-	{
-		largeRumbleParam = largeToLow;
-		smallRumbleParam = smallToHigh;
-	}
-
-	std::pair<uint64_t, ProControllerHid::InputStatus> ProconX360Bridge::GetLastInput() const
-	{
-		std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
-		return lastInput_;
-	}
-
-	std::pair<uint64_t, ProControllerHid::CorrectedInputStatus> ProconX360Bridge::GetLastInputCorrected() const
-	{
-		std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
-		return lastInputCorrected_;
-	}
-
-	std::pair<uint64_t, ViGEm::X360InputStatus> ProconX360Bridge::GetLastInputSent() const
-	{
-		std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
-		return lastInputSent_;
-	}
-
-	std::pair<uint64_t, ViGEm::X360OutputStatus> ProconX360Bridge::GetLastOutputIn() const
-	{
-		std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
-		return lastOutput_;
-	}
-
-	std::pair<uint64_t, ViGEm::X360OutputStatus> ProconX360Bridge::GetLastOutputOut() const
-	{
-		std::lock_guard<decltype(lastOutputOutMutex_)> lock(lastOutputOutMutex_);
-		return lastOutputOut_;
-	}
-
-	void ProconX360Bridge::HandleControllerOutput(const X360OutputStatus &x360Output)
-	{
-		{
-			std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
-			lastOutput_ = {GetCurrentTimestamp(), x360Output};
-		}
-	}
-
-	void ProconX360Bridge::HandleControllerInput(const InputStatus &inputStatus)
-	{
-		const auto corrected = controller_->CorrectInput(inputStatus);
-		ViGEm::X360InputStatus status =
-		{
-			{
-				corrected.Buttons.UpButton,
-				corrected.Buttons.DownButton,
-				corrected.Buttons.LeftButton,
-				corrected.Buttons.RightButton,
-				corrected.Buttons.PlusButton,
-				corrected.Buttons.MinusButton,
-				corrected.Buttons.LStick,
-				corrected.Buttons.RStick,
-				corrected.Buttons.LButton,
-				corrected.Buttons.RButton,
-				corrected.Buttons.HomeButton,
-				false,
-				corrected.Buttons.AButton,
-				corrected.Buttons.BButton,
-				corrected.Buttons.XButton,
-				corrected.Buttons.YButton,
-
-				static_cast<uint8_t>(corrected.Buttons.LZButton ? 255 : 0),
-				static_cast<uint8_t>(corrected.Buttons.RZButton ? 255 : 0),
-			},
-			static_cast<int16_t>(corrected.LeftStick.X * 32767),
-			static_cast<int16_t>(corrected.LeftStick.Y * 32767),
-			static_cast<int16_t>(corrected.RightStick.X * 32767),
-			static_cast<int16_t>(corrected.RightStick.Y * 32767),
-		};
-		x360_->SendReport(status);
-
-		{
-			auto timestamp = GetCurrentTimestamp();
-			std::lock_guard<decltype(lastInputMutex_)> lock(lastInputMutex_);
-			lastInput_ = {timestamp, inputStatus};
-			lastInputCorrected_ = {timestamp, corrected};
-			lastInputSent_ = {timestamp, status};
-		}
-	}
-
-	void ProconX360Bridge::RumbleControlTreadBody()
-	{
-		auto clock = std::chrono::steady_clock::now();
-		while (rumbleControlThreadRunning_.test_and_set())
-		{
-			largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first - largeRumbleParam.Left.DecaySpeed, 0);
-			smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first - smallRumbleParam.Left.DecaySpeed, 0);
-			largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second - largeRumbleParam.Right.DecaySpeed, 0);
-			smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second - smallRumbleParam.Right.DecaySpeed, 0);
-			{
-				std::lock_guard<decltype(lastOutputMutex_)> lock(lastOutputMutex_);
-				largeMoterAmplification_.first = std::max<int>(largeMoterAmplification_.first, lastOutput_.second.largeRumble);
-				smallMoterAmplification_.first = std::max<int>(smallMoterAmplification_.first, lastOutput_.second.smallRumble);
-				largeMoterAmplification_.second = std::max<int>(largeMoterAmplification_.second, lastOutput_.second.largeRumble);
-				smallMoterAmplification_.second = std::max<int>(smallMoterAmplification_.second, lastOutput_.second.smallRumble);
-			}
-
-			controller_->SetRumbleBasic(
-				largeMoterAmplification_.first * largeRumbleParam.Left.MaxAmplitude / 255,
-				largeMoterAmplification_.second * largeRumbleParam.Right.MaxAmplitude / 255,
-				smallMoterAmplification_.first * smallRumbleParam.Left.MaxAmplitude / 255,
-				smallMoterAmplification_.second * smallRumbleParam.Right.MaxAmplitude / 255,
-				largeRumbleParam.Left.Frequency,
-				largeRumbleParam.Right.Frequency,
-				smallRumbleParam.Left.Frequency,
-				smallRumbleParam.Right.Frequency
-			);
-
-			{
-				std::lock_guard<decltype(lastOutputOutMutex_)> lock(lastOutputOutMutex_);
-				lastOutputOut_ = {
-					GetCurrentTimestamp(), {
-						static_cast<uint8_t>(largeMoterAmplification_.first),
-						static_cast<uint8_t>(smallMoterAmplification_.first),
-						0
-					}
-				};
-			}
-
-			clock += std::chrono::milliseconds(16);
-			std::this_thread::sleep_until(clock);
-		}
-
-		controller_->SetRumbleBasic(0, 0, 0, 0);
-	}
-
-	int64_t ProconX360Bridge::GetCurrentTimestamp()
-	{
-		using namespace std::chrono;
-		return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
 	}
 }

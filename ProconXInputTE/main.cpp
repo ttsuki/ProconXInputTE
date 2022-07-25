@@ -9,6 +9,6 @@ namespace ProconXInputTE
 
 int main()
 {
-	ProconXInputTE::Tests::RunProControllerDriverTest();
-	//ProconXInputTE::Tests::RunX360BridgeTest();
+	//ProconXInputTE::Tests::RunProControllerDriverTest();
+	ProconXInputTE::Tests::RunX360BridgeTest();
 }

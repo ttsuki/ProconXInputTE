@@ -173,14 +173,17 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ProconX360Bridge.cpp" />
     <ClCompile Include="Tests\TestHelper.cpp" />
     <ClCompile Include="Tests\ProControllerTest.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader>Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="Tests\X360BridgeTest.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ProconX360Bridge.h" />
     <ClInclude Include="Tests\TestHelper.h" />
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
