@@ -1,95 +1,107 @@
+#include <iomanip>
 #include <memory>
 #include <vector>
 #include <string>
 #include <mutex>
 #include <iostream>
+#include <sstream>
 
+#include <ProControllerHid/hidio.h>
 #include <ProControllerHid/ProController.h>
 
 #include "TestHelper.h"
+#define CLEAR_LINE "\x1b[2K"
 
 namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		constexpr int StatusLines = 8;
+		bool enable_imu_sensor = true;
+		bool enable_packet_dump = true;
 
-		void RunProconTest()
+		void logger_output(const std::string& text)
+		{
+			static std::mutex m;
+			std::lock_guard lock(m);
+			std::cerr << (CLEAR_LINE + text + "\n");
+		}
+
+		void RunProControllerDriverTest()
 		{
 			using namespace ProControllerHid;
+
 			SetupConsoleWindow();
 
 			std::mutex console;
-			std::vector<std::unique_ptr<ProController>> controllers;
-			int index = 0;
+			
 
-			for (const auto &devPath : ProController::EnumerateProControllerDevicePaths())
+			struct ControllerTest
 			{
-				std::cout << "Device found:" << std::endl;
-				std::cout << "  Path: " << devPath << std::endl;
-				//std::wcout << L"  Manufacture: " << device.manufacturer_string << std::endl;
-				//std::wcout << L"  Product: " << device.product_string << std::endl;
+				int index{};
+				std::unique_ptr<ProController> controller{};
+				InputStatus input{};
+				RawInputStatus raw{};
+			};
+
+			std::vector<std::unique_ptr<ControllerTest>> controllers;
+
+			int index = 0;
+			for (const auto &device : hidio::enumerate_devices(ProController::DeviceVendorID, ProController::DeviceProductID))
+			{
+				auto entry = std::make_unique<ControllerTest>();
+				entry->index = index;
+
+				std::cout << "Device found: index = " << index << std::endl;
+				std::cout << "  Path: " << device.device_path << std::endl;
+				std::wcout << L"  Manufacture: " << device.manufacture_string << std::endl;
+				std::wcout << L"  Product: " << device.product_string << std::endl;
 
 				std::wcout << L"  Opening device..." << std::endl;
-				auto callback = [&controllers, index, &console](const InputStatus &s)
+				entry->controller = ProController::Connect(
+					device.device_path.c_str(),
+					enable_imu_sensor,
+					[index](const char* text) { logger_output(std::to_string(index) + ": " + text); },
+					enable_packet_dump);
+
+				if (!entry->controller)
 				{
-					auto &controller = controllers[index];
+					std::wcout << L"  Failed to open controller..." << std::endl;
+					continue;
+				}
+
+				entry->controller->SetInputStatusCallback([e = entry.get()](const InputStatus& input)
+				{
+					e->input = input;
+				});
+
+				entry->controller->SetRawInputStatusCallback([e = entry.get(), controller = entry->controller.get()](const RawInputStatus& raw)
+				{
+					e->raw = raw;
 
 					// Rumble output
-					int lf = s.LeftStick.AxisX >> 4;
-					int la = s.LeftStick.AxisY >> 4;
-					int hf = s.RightStick.AxisX >> 4;
-					int ha = s.RightStick.AxisY >> 4;
-
-					int led = s.Buttons.AButton << 0
-						| s.Buttons.BButton << 1
-						| s.Buttons.XButton << 2
-						| s.Buttons.YButton << 3;
-
-					std::string line(index * StatusLines, '\n');
-					InputStatusString st = InputStatusString(s, controller->CorrectInput(s));
-
-					line += "\x1b[2K" "---- Controller " + std::to_string(index) + "\n";
-					line += "\x1b[2K" "  Input > Clock=" + st.GetClockString() + " Report=" + st.GetRawDataString() + "\n";
-					line += "\x1b[2K" "  - Parsed > " + st.GetParsedInput() + "\n";
-					line += "\x1b[2K" "  - Parsed > " + st.GetParsedImu() + "\n";
-					line += "\x1b[2K" "  - Corrected > " + st.GetCorrectedInput() + "\n";
-					line += "\x1b[2K" "  - Corrected > " + st.GetCorrectedImu() + "\n";
-
-					line += "\x1b[2K" "  Output > Vibration Test (L/R Button): ";
-					line += " lf/la=" + std::to_string(lf) + "/" + std::to_string(la);
-					line += " hf/ha=" + std::to_string(hf) + "/" + std::to_string(ha);
-					line += "\n";
-
-					line += "\x1b[2K" "  Output > LED Test (ABXY Button): ";
-					line += led & 1 ? "*" : "_";
-					line += led & 2 ? "*" : "_";
-					line += led & 4 ? "*" : "_";
-					line += led & 8 ? "*" : "_";
-					line += "\n";
-
-					for (int i = 0; i < (index + 1) * StatusLines; i++)
-					{
-						line += "\x1b[1A";
-					}
-
-					{
-						std::lock_guard<std::mutex> lock(console);
-						std::cout << line << std::flush;
-					}
+					auto lf = raw.LeftStick.AxisX >> 4;
+					auto la = raw.LeftStick.AxisY >> 4;
+					auto hf = raw.RightStick.AxisX >> 4;
+					auto ha = raw.RightStick.AxisY >> 4;
 
 					controller->SetRumbleBasic(
-						s.Buttons.LZButton ? la : 0,
-						s.Buttons.RZButton ? la : 0,
-						s.Buttons.LButton ? ha : 0,
-						s.Buttons.RButton ? ha : 0,
+						raw.Buttons.LZButton ? la : 0,
+						raw.Buttons.RZButton ? la : 0,
+						raw.Buttons.LButton ? ha : 0,
+						raw.Buttons.RButton ? ha : 0,
 						lf, lf, hf, hf);
 
-					// player status led output
-					controller->SetPlayerLed(led);
-				};
+					// Player status led output
+					auto led = raw.Buttons.AButton << 0
+						| raw.Buttons.BButton << 1
+						| raw.Buttons.XButton << 2
+						| raw.Buttons.YButton << 3;
 
-				controllers.emplace_back(ProController::Connect(devPath.c_str(), index + 1, callback, true));
+					controller->SetPlayerLed(led);
+				});
+
+
+				controllers.emplace_back(std::move(entry));
 				index++;
 			}
 
@@ -101,17 +113,55 @@ namespace ProconXInputTE
 
 			std::cout << std::endl;
 			std::cout << "Controller starting...\n" << std::endl;
-			for (auto &&controller : controllers)
-			{
-				controller->StartStatusCallback();
-			}
-			WaitEscapeOrCtrlC();
-			for (auto &&controller : controllers)
-			{
-				controller->StopStatusCallback();
-			}
 
-			std::cout << std::string(controllers.size() * StatusLines + 1, '\n');
+			std::atomic_flag running{};
+			running.test_and_set();
+			std::thread thread = std::thread([&]
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
+					while (running.test_and_set())
+					{
+						std::ostringstream output;
+						int line_count = 0;
+
+						output << CLEAR_LINE << "\n", line_count++;
+						for (auto& c : controllers)
+						{
+							auto clock = std::chrono::duration_cast<std::chrono::duration<double>>(c->raw.Timestamp.time_since_epoch()).count();
+							output << CLEAR_LINE "---- Controller " << c->index << "\n", line_count++;
+							output << CLEAR_LINE "  Input > Clock=" << std::fixed << std::setprecision(3) << clock << " Report=" + DumpInputStatusAsString(c->raw) << "\n", line_count++;
+							output << CLEAR_LINE "  - Parsed > " << InputStatusAsString(c->raw) << "\n", line_count++;
+							output << CLEAR_LINE "  - Parsed > " << ImuSensorStatusAsString(c->raw) << "\n", line_count++;
+							output << CLEAR_LINE "  - Corrected > " << InputStatusAsString(c->input) << "\n", line_count++;
+							output << CLEAR_LINE "  - Corrected > " << ImuSensorStatusAsString(c->input) << "\n", line_count++;
+
+							output << CLEAR_LINE "  Output > Vibration Test (L/R Button): ";
+							output << " lf/la=" << std::to_string(c->raw.LeftStick.AxisX >> 4) << "/" << std::to_string(c->raw.LeftStick.AxisY >> 4);
+							output << " hf/ha=" << std::to_string(c->raw.RightStick.AxisX >> 4) << "/" << std::to_string(c->raw.RightStick.AxisY >> 4);
+							output << "\n", line_count++;
+
+							output << CLEAR_LINE "  Output > LED Test (ABXY Button): ";
+							output << (c->raw.Buttons.AButton ? "*" : "_");
+							output << (c->raw.Buttons.BButton ? "*" : "_");
+							output << (c->raw.Buttons.XButton ? "*" : "_");
+							output << (c->raw.Buttons.YButton ? "*" : "_");
+							output << "\n", line_count++;
+						}
+
+						for (int i = 0; i < line_count + 1; i++)
+						{
+							output << "\x1b[1A";
+						}
+
+						logger_output(output.str());
+						std::this_thread::sleep_for(std::chrono::milliseconds(10));
+					}
+				});
+
+			WaitEscapeOrCtrlC();
+			running.clear();
+			thread.join();
+
 			controllers.clear();
 			std::cout << "Closed." << std::endl;
 		}
