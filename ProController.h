@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <chrono>
 #include <memory>
 #include <functional>
 #include <vector>
@@ -7,20 +8,14 @@
 
 namespace ProControllerHid
 {
-	class ControllerDevice
-	{
-	public:
-		ControllerDevice() = default;
-		ControllerDevice(const ControllerDevice &other) = delete;
-		ControllerDevice& operator=(const ControllerDevice &other) = delete;
-		virtual ~ControllerDevice() = default;
-	};
+	using Clock = std::chrono::high_resolution_clock;
+	using Timestamp = Clock::time_point;
 
 	struct StickStatus
 	{
 		unsigned AxisX : 12;
 		unsigned AxisY : 12;
-		unsigned padding : 8;
+		unsigned _padding : 8;
 	};
 
 	struct ButtonStatus
@@ -52,7 +47,7 @@ namespace ProControllerHid
 		unsigned LButton : 1;
 		unsigned LZButton : 1;
 
-		unsigned padding_ : 8;
+		unsigned _padding : 8;
 	};
 
 	struct SensorStatus
@@ -66,10 +61,9 @@ namespace ProControllerHid
 		Vector3i Gyroscope;
 	};
 
-	struct InputStatus
+	struct RawInputStatus
 	{
-		uint64_t clock;
-
+		Timestamp Timestamp;
 		StickStatus LeftStick;
 		StickStatus RightStick;
 		ButtonStatus Buttons;
@@ -77,53 +71,70 @@ namespace ProControllerHid
 		SensorStatus Sensors[3];
 	};
 
-	struct NormalizedStickStatus
+	struct Vector2f
 	{
 		float X, Y;
 	};
 
-	struct NormalizedSensorStatus
+	struct Vector3f
 	{
-		struct Vector3f
-		{
-			float X, Y, Z;
-		};
+		float X, Y, Z;
+	};
 
+	struct ImuSensorStatus
+	{
 		Vector3f Accelerometer;
 		Vector3f Gyroscope;
 	};
 
-	struct CorrectedInputStatus
+	struct InputStatus
 	{
-		uint64_t clock;
-		NormalizedStickStatus LeftStick;
-		NormalizedStickStatus RightStick;
+		Timestamp Timestamp;
+		Vector2f LeftStick;
+		Vector2f RightStick;
 		ButtonStatus Buttons;
 		bool HasSensorStatus;
-		NormalizedSensorStatus Sensors[3];
+		ImuSensorStatus Sensors[3];
 	};
 
-	class ProController : public ControllerDevice
+	class ProController
 	{
 	public:
 		ProController() = default;
-		ProController(const ProController &other) = delete;
-		ProController& operator=(const ProController &other) = delete;
+		ProController(const ProController& other) = delete;
+		ProController(ProController&& other) noexcept = delete;
+		ProController& operator=(const ProController& other) = delete;
+		ProController& operator=(ProController&& other) noexcept = delete;
 		virtual ~ProController() = default;
 
-		virtual void StartStatusCallback() = 0;
-		virtual void StopStatusCallback() = 0;
-		virtual CorrectedInputStatus CorrectInput(const InputStatus &raw) = 0;
+	public:
+		static inline constexpr uint16_t DeviceVendorID{0x057E};
+		static inline constexpr uint16_t DeviceProductID{0x2009};
+		static std::vector<std::string> EnumerateProControllerDevicePaths();
+
+		static std::unique_ptr<ProController> Connect(
+			const char* device_path,
+			bool enable_imu_sensor = false,
+			std::function<void(const char*)> write_log_callback = nullptr,
+			bool dump_packet_log = false);
+
+		virtual void SetInputStatusCallback(std::function<void(const InputStatus& status)> callback) = 0;
+
+		virtual void SetRawInputStatusCallback(std::function<void(const RawInputStatus& status)> callback) = 0;
 
 		virtual void SetRumbleBasic(
-			uint8_t leftLowAmp, uint8_t rightLowAmp, uint8_t leftHighAmp = 0x00, uint8_t rightHighAmp = 0x00,
-			uint8_t leftLowFreq = 0x80, uint8_t rightLowFreq = 0x80, uint8_t leftHighFreq = 0x80, uint8_t rightHighFreq = 0x80) = 0;
+			uint8_t left_low_amp, uint8_t right_low_amp,
+			uint8_t left_high_amp = 0x00, uint8_t right_high_amp = 0x00,
+			uint8_t left_low_freq = 0x80, uint8_t right_low_freq = 0x80,
+			uint8_t left_high_freq = 0x80, uint8_t right_high_freq = 0x80) = 0;
 
-		virtual void SetPlayerLed(uint8_t playerLed) = 0;
-
-		using InputStatusCallback = std::function<void(const InputStatus &status)>;
-		static std::unique_ptr<ProController> Connect(const char *pathToDevice, int index, InputStatusCallback statusCallback, bool imuSensorEnabled = false);
-
-		static std::vector<std::string> EnumerateProControllerDevicePaths();
+		virtual void SetPlayerLed(uint8_t player_led_bits) = 0;
 	};
+
+	// Status dump helper
+	std::string DumpInputStatusAsString(const RawInputStatus& input);
+	std::string InputStatusAsString(const RawInputStatus& input);
+	std::string InputStatusAsString(const InputStatus& input);
+	std::string ImuSensorStatusAsString(const RawInputStatus& input);
+	std::string ImuSensorStatusAsString(const InputStatus& input);
 }
