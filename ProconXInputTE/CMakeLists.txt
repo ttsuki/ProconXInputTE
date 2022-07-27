@@ -5,7 +5,7 @@ add_executable(
 	main.cpp
 	ProconX360Bridge.cpp
 	Tests/TestHelper.cpp
-	Tests/ProControllerTest.cpp
+	
 	Tests/X360BridgeTest.cpp
 )
 
