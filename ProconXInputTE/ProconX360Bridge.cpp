@@ -13,15 +13,12 @@ namespace ProconXInputTE
 	ProconX360Bridge::ProconX360Bridge(const char* procon_device_path, ::ViGEm::ViGEmClient* client)
 	{
 		x360_ = client->AddX360Controller();
+		auto index = x360_->GetDeviceIndex();
 
 		controller_ = ProController::Connect(
 			procon_device_path,
 			false,
-#ifndef NDEBUG
-			[](const char* log) { std::cerr << log << std::endl; }
-#else
-			nullptr
-#endif
+			[index](const char* log) { std::cerr << "device[" << std::to_string(index) << "]: " << log << std::endl; }
 		);
 
 		if (!controller_)
@@ -91,10 +88,10 @@ namespace ProconXInputTE
 				}
 
 				controller_->SetRumbleBasic(
-					large_rumble_value_.first * large_rumble_parameter_.Left.MaxAmplitude / 255,
-					large_rumble_value_.second * large_rumble_parameter_.Right.MaxAmplitude / 255,
-					small_rumble_value_.first * small_rumble_parameter_.Left.MaxAmplitude / 255,
-					small_rumble_value_.second * small_rumble_parameter_.Right.MaxAmplitude / 255,
+					static_cast<uint8_t>(large_rumble_value_.first * large_rumble_parameter_.Left.MaxAmplitude / 255),
+					static_cast<uint8_t>(large_rumble_value_.second * large_rumble_parameter_.Right.MaxAmplitude / 255),
+					static_cast<uint8_t>(small_rumble_value_.first * small_rumble_parameter_.Left.MaxAmplitude / 255),
+					static_cast<uint8_t>(small_rumble_value_.second * small_rumble_parameter_.Right.MaxAmplitude / 255),
 					large_rumble_parameter_.Left.Frequency,
 					large_rumble_parameter_.Right.Frequency,
 					small_rumble_parameter_.Left.Frequency,

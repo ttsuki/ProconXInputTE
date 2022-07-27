@@ -4,9 +4,6 @@ add_executable(
 	${PROJECT_NAME}
 	main.cpp
 	ProconX360Bridge.cpp
-	Tests/TestHelper.cpp
-	
-	Tests/X360BridgeTest.cpp
 )
 
 target_include_directories(
