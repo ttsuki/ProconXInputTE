@@ -11,10 +11,6 @@ namespace ProconXInputTE
 	class ProconX360Bridge final
 	{
 	public:
-
-		ProconX360Bridge(const char *proConDevicePath, ::ViGEm::ViGEmClient *client);
-		~ProconX360Bridge();
-
 		struct RumbleParams
 		{
 			struct Act
@@ -25,41 +21,49 @@ namespace ProconXInputTE
 			} Left, Right;
 		};
 
-		void SetRumbleParameter(RumbleParams largeToLow, RumbleParams smallToHigh);
-		int GetIndex() const { return x360_->GetDeviceIndex(); }
-		std::pair<uint64_t, ProControllerHid::InputStatus> GetLastInput() const;
-		std::pair<uint64_t, ProControllerHid::CorrectedInputStatus> GetLastInputCorrected() const;
-		std::pair<uint64_t, ViGEm::X360InputStatus> GetLastInputSent() const;
-		std::pair<uint64_t, ViGEm::X360OutputStatus> GetLastOutputIn() const;
-		std::pair<uint64_t, ViGEm::X360OutputStatus> GetLastOutputOut() const;
 
 	private:
 		mutable std::mutex mutex_{};
+
 		std::unique_ptr<ProControllerHid::ProController> controller_{};
 		std::unique_ptr<ViGEm::X360Controller> x360_{};
 
-		std::pair<int64_t, ProControllerHid::InputStatus> lastInput_{};
-		std::pair<int64_t, ProControllerHid::CorrectedInputStatus> lastInputCorrected_{};
-		std::pair<int64_t, ViGEm::X360InputStatus> lastInputSent_{};
-		std::pair<int64_t, ViGEm::X360OutputStatus> lastOutput_{};
-		std::pair<int64_t, ViGEm::X360OutputStatus> lastOutputOut_{};
+		std::atomic<std::pair<int64_t, ProControllerHid::InputStatus>> lastInput_{};
+		std::atomic<std::pair<int64_t, ViGEm::X360InputStatus>> lastInputSent_{};
+		std::atomic<std::pair<int64_t, ViGEm::X360OutputStatus>> lastOutput_{};
+		std::atomic<std::pair<int64_t, ViGEm::X360OutputStatus>> lastOutputOut_{};
 
-		mutable std::mutex lastInputMutex_;
-		mutable std::mutex lastOutputMutex_;
-		mutable std::mutex lastOutputOutMutex_;
+		std::thread rumble_thread_{};
+		std::atomic_flag rumble_thread_running_{};
+		RumbleParams large_rumble_parameter_ = { {130, 20, 216}, {142, 20, 216}, };
+		RumbleParams small_rumble_parameter_ = { {72, 30, 176}, {100, 30, 176} };
+		std::pair<int, int> large_rumble_value_{};
+		std::pair<int, int> small_rumble_value_{};
 
-		std::pair<int, int> largeMoterAmplification_{};
-		std::pair<int, int> smallMoterAmplification_{};
-		std::thread rumbleControlThread_{};
-		std::atomic_flag rumbleControlThreadRunning_{ATOMIC_FLAG_INIT};
+	public:
+		static int64_t GetCurrentTimestamp() noexcept
+		{
+			using namespace std::chrono;
+			return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+		}
 
-		RumbleParams largeRumbleParam = {{130, 20, 216}, {142, 20, 216},};
-		RumbleParams smallRumbleParam = {{72, 30, 176}, {100, 30, 176}};
+		ProconX360Bridge(const char* procon_device_path, ::ViGEm::ViGEmClient* client);
+		~ProconX360Bridge();
 
-	private:
-		void HandleControllerOutput(const ViGEm::X360OutputStatus &x360Output);
-		void HandleControllerInput(const ProControllerHid::InputStatus &inputStatus);
-		void RumbleControlTreadBody();
-		static int64_t GetCurrentTimestamp();
+		[[nodiscard]] int GetIndex() const
+		{
+			return static_cast<int>(x360_->GetDeviceIndex());
+		}
+
+		void SetRumbleParameter(RumbleParams large_to_low, RumbleParams small_to_high)
+		{
+			large_rumble_parameter_ = large_to_low;
+			small_rumble_parameter_ = small_to_high;
+		}
+
+		[[nodiscard]] std::pair<uint64_t, ProControllerHid::InputStatus> GetLastInput() const { return lastInput_.load(); }
+		[[nodiscard]] std::pair<uint64_t, ViGEm::X360InputStatus> GetLastInputSent() const { return lastInputSent_.load(); }
+		[[nodiscard]] std::pair<uint64_t, ViGEm::X360OutputStatus> GetLastOutputIn() const { return lastOutput_.load(); }
+		[[nodiscard]] std::pair<uint64_t, ViGEm::X360OutputStatus> GetLastOutputOut() const { return lastOutputOut_.load(); }
 	};
 }

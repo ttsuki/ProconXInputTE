@@ -1,14 +1,14 @@
-﻿namespace ProconXInputTE
+namespace ProconXInputTE
 {
 	namespace Tests
 	{
-		void RunProconTest();
+		void RunProControllerDriverTest();
 		void RunX360BridgeTest();
 	}
 }
 
 int main()
 {
-	//ProconXInputTE::Tests::RunProconTest();
+	//ProconXInputTE::Tests::RunProControllerDriverTest();
 	ProconXInputTE::Tests::RunX360BridgeTest();
 }
