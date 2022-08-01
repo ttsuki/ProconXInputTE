@@ -81,10 +81,10 @@ namespace ProconXInputTE
 				small_rumble_value_.second = std::max<int>(small_rumble_value_.second - small_rumble_parameter_.Right.DecaySpeed, 0);
 				{
 					auto o = lastOutput_.load();
-					large_rumble_value_.first = std::max<int>(large_rumble_value_.first, o.second.largeRumble);
-					small_rumble_value_.first = std::max<int>(small_rumble_value_.first, o.second.smallRumble);
-					large_rumble_value_.second = std::max<int>(large_rumble_value_.second, o.second.largeRumble);
-					small_rumble_value_.second = std::max<int>(small_rumble_value_.second, o.second.smallRumble);
+					large_rumble_value_.first = std::max<int>(large_rumble_value_.first, o.second.LargeRumble);
+					small_rumble_value_.first = std::max<int>(small_rumble_value_.first, o.second.SmallRumble);
+					large_rumble_value_.second = std::max<int>(large_rumble_value_.second, o.second.LargeRumble);
+					small_rumble_value_.second = std::max<int>(small_rumble_value_.second, o.second.SmallRumble);
 				}
 
 				controller_->SetRumbleBasic(

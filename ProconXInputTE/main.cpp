@@ -92,11 +92,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[])
 				output << b->GetIndex() << ">";
 				output << "Vib";
 				output << " L:"
-					<< std::setw(3) << static_cast<int>(outputOut.largeRumble) << "/"
-					<< std::setw(3) << static_cast<int>(outputIn.largeRumble);
+					<< std::setw(3) << static_cast<int>(outputOut.LargeRumble) << "/"
+					<< std::setw(3) << static_cast<int>(outputIn.LargeRumble);
 				output << " H:"
-					<< std::setw(3) << static_cast<int>(outputOut.smallRumble) << "/"
-					<< std::setw(3) << static_cast<int>(outputIn.smallRumble);
+					<< std::setw(3) << static_cast<int>(outputOut.SmallRumble) << "/"
+					<< std::setw(3) << static_cast<int>(outputIn.SmallRumble);
 				output << "  In " << InputStatusAsString(input);
 				output << LF;
 			}
