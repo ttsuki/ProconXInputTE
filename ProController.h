@@ -122,13 +122,33 @@ namespace ProControllerHid
 
 		virtual void SetRawInputStatusCallback(std::function<void(const RawInputStatus& status)> callback) = 0;
 
-		virtual void SetRumbleBasic(
+		virtual void SetPlayerLed(uint8_t player_led_bits) = 0;
+
+		struct BasicRumble
+		{
+			struct
+			{
+				struct
+				{
+					uint8_t Freq, Amp;
+				} High, Low;
+			} Left{{0x80, 0x00}, {0x80, 0x00}}
+			, Right{{0x80, 0x00}, {0x80, 0x00}};
+		};
+
+		virtual void SetRumble(BasicRumble rumble) = 0;
+
+		void SetRumbleBasic(
 			uint8_t left_low_amp, uint8_t right_low_amp,
 			uint8_t left_high_amp = 0x00, uint8_t right_high_amp = 0x00,
 			uint8_t left_low_freq = 0x80, uint8_t right_low_freq = 0x80,
-			uint8_t left_high_freq = 0x80, uint8_t right_high_freq = 0x80) = 0;
-
-		virtual void SetPlayerLed(uint8_t player_led_bits) = 0;
+			uint8_t left_high_freq = 0x80, uint8_t right_high_freq = 0x80)
+		{
+			return SetRumble(BasicRumble{
+				{{left_high_freq, left_high_amp}, {left_low_freq, left_low_amp}},
+				{{right_high_freq, right_high_amp}, {right_low_freq, right_low_amp}}
+			});
+		}
 	};
 
 	// Status dump helper
