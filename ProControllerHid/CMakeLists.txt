@@ -7,3 +7,13 @@ add_library(
 	ProController.h
 	ProController.cpp
 )
+
+add_executable(
+	${PROJECT_NAME}.Test
+	ProController.Test.cpp
+)
+
+target_link_libraries(
+	${PROJECT_NAME}.Test
+	${PROJECT_NAME}
+)

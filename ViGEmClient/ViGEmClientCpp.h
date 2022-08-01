@@ -30,7 +30,7 @@ namespace ViGEm
 
 			unsigned LTrigger : 8;
 			unsigned RTrigger : 8;
-		} buttons;
+		} Buttons;
 
 		int16_t LeftStickAxisX;
 		int16_t LeftStickAxisY;
@@ -40,9 +40,9 @@ namespace ViGEm
 
 	struct X360OutputStatus
 	{
-		uint8_t largeRumble;
-		uint8_t smallRumble;
-		uint8_t ledNumber;
+		uint8_t LargeRumble;
+		uint8_t SmallRumble;
+		uint8_t LedNumber;
 	};
 
 	using X360OutputCallback = std::function<void(const X360OutputStatus& status)>;

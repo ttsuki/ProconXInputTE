@@ -84,9 +84,9 @@ namespace ViGEm
 						LPVOID UserData)
 						{
 							X360OutputStatus status{};
-							status.largeRumble = LargeMotor;
-							status.smallRumble = SmallMotor;
-							status.ledNumber = LedNumber;
+							status.LargeRumble = LargeMotor;
+							status.SmallRumble = SmallMotor;
+							status.LedNumber = LedNumber;
 							static_cast<X360ControllerImpl*>(UserData)->NotificationCallbackProc(status);
 						}, this)
 				);
