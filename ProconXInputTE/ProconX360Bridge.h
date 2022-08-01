@@ -15,7 +15,10 @@ namespace ProconXInputTE
 
 		using Timestamp = ProControllerHid::Timestamp;
 
-		struct Options { };
+		struct Options
+		{
+			bool ReplaceButtonsAsX360Layout{};
+		};
 
 		template <class T>
 		struct StatusWithTimeStamp
