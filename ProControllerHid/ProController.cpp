@@ -615,14 +615,10 @@ namespace ProControllerHid
 			raw_input_status_callback_ = callback;
 		}
 
-		void SetRumbleBasic(
-			uint8_t left_low_amp, uint8_t right_low_amp,
-			uint8_t left_high_amp = 0x00, uint8_t right_high_amp = 0x00,
-			uint8_t left_low_freq = 0x80, uint8_t right_low_freq = 0x80,
-			uint8_t left_high_freq = 0x80, uint8_t right_high_freq = 0x80) override
+		void SetRumble(BasicRumble rumble) override
 		{
-			uint32_t l = 0x40000000u | left_high_freq >> 1 << 2 | left_high_amp >> 1 << 9 | left_low_freq >> 1 << 16 | left_low_amp >> 1 << 23;
-			uint32_t r = 0x40000000u | right_high_freq >> 1 << 2 | right_high_amp >> 1 << 9 | right_low_freq >> 1 << 16 | right_low_amp >> 1 << 23;
+			uint32_t l = 0x40000000u | rumble.Left.High.Freq >> 1 << 2 | rumble.Left.High.Amp >> 1 << 9 | rumble.Left.Low.Freq >> 1 << 16 | rumble.Left.Low.Amp >> 1 << 23;
+			uint32_t r = 0x40000000u | rumble.Right.High.Freq >> 1 << 2 | rumble.Right.High.Amp >> 1 << 9 | rumble.Right.Low.Freq >> 1 << 16 | rumble.Right.Low.Amp >> 1 << 23;
 
 			rumble_data_.resize(8);
 			rumble_data_[0] = static_cast<uint8_t>(l >> 0);
