@@ -1,56 +1,81 @@
+[日本語READMEはこちら](README.ja.md)
+
 # ProconXInputTE
 
-I wanted to play [TETRIS EFFECT](http://www.tetriseffect.game/) with Nintendo Switch Pro controller :video_game: with vibration!!!
+  I wanted to play [TETRIS EFFECT](http://www.tetriseffect.game/) with Nintendo Switch Pro Controller 🎮 with vibration!!!
+
 
 ---
 
 ## About
 
-An XInput user-mode driver for Nintendo Switch Pro Controller (USB-wired mode) using ViGEm.
+  An XInput user-mode driver for Nintendo Switch Pro Controller (USB-wired mode) using ViGEm bus.
+
+  This driver application supports VIBRATION!
+
 
 ## Features
 
-- USB wired mode Pro Controller user-mode driver.
-- XInput support with ViGEm.
-- Vibration support.
+  - Input sticks and buttons
+  - Output Vibration
+  - Swap buttons (A/B, X/Y) as x360 layout: start app with `--use-x360-layout` option.
+
 
 ## Download
 
-See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
+  See [Releases](https://github.com/ttsuki/ProconXInputTE/releases/latest) page.
+
 
 ## How to use
 
- 0. Install [ViGEm Bus Driver](https://github.com/ViGEm/ViGEmBus/releases).
- 1. Connect your Nintendo Switch Pro Controller with USB cable to PC.
- 2. Start the driver application [ProconXInputTE_x86.exe](https://github.com/ttsuki/ProconXInputTE/releases/latest).
- 3. Play your favorite game :blush:
+  0. Install [ViGEm Bus Driver](https://github.com/ViGEm/ViGEmBus/releases).
+  1. (optional) Install [HidHide](https://github.com/ViGEm/HidHide/releases) and configure for hiding controllers from other apps.
+  2. Connect your Nintendo Switch Pro Controller with USB cable to PC.
+  3. Start the driver application [ProconXInputTE_x86.exe](https://github.com/ttsuki/ProconXInputTE/releases/latest).
+  4. Play your favorite game 😊
 
+---
+
+## For developpers
+
+### Build Environment
+
+  - Visual Studio 2019/2022 with CMake
+
+
+### Requirements
+
+  - ViGEm Bus Driver: https://github.com/ViGEm/ViGEmBus
+
+
+### Third-party library (submodules)
+
+  - ViGEm Client: https://github.com/ViGEm/ViGEmClient
+
+
+### Sub-projects
+
+- ViGEm C++ Client (RAII wrapper)
+
+    is in [ViGEmClient/](ViGEmClient/) directory.
+
+- Pro Controller user-mode driver
+
+    is in [ProControllerHid](ProControllerHid/) directory.
+
+    - It supports sticks/buttons input, 6-axis IMU sensor input, and basic rumbling output.
+
+    - If you use it directly in your project, you do not need ViGEm Client.
+
+
+### Thanks to
+
+  - Reverse Engineering Note: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering
 
 ---
 
-# For developpers
-
-Also you can use this project as a Nintendo Switch Pro controller :video_game: user mode driver SDK.  
-This drivers supported 6-axis accelerometer/gyroscope sensor inputs (but disabled for XInput).  
-See the `ProControllerHid` project directory and [a test code](/ProconXInputTE/Tests/ProControllerTest.cpp).  
-
-## Build Environment
- - Visual Studio 2019
-
-## Requirements
- - ViGEm Bus Driver: [https://github.com/ViGEm/ViGEmBus](https://github.com/ViGEm/ViGEmBus/)
-
-## Third-party library / submodules
- - ViGEm Client: https://github.com/ViGEm/ViGEmClient
-
-## Thanks to
- - Reverse Engineering Note: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering
- 
----
-## Bugs
-  - Unstable. Suddenly stops input or stops output(rumbling)...
-
----
 ## License
- MIT (C) 2019 ttsuki  
- https://github.com/ttsuki/ProconXInputTE/  
+  [MIT (C) 2019 ttsuki](LICENSE)  
+  https://github.com/ttsuki/ProconXInputTE/  
+
+  The files in the directory `ThirdParty/ViGEmClient` are separated LICENSEed by [ThirdParty/ViGEmClient/LICENSE](ThirdParty/ViGEmClient/LICENSE) .
