@@ -12,7 +12,7 @@ namespace ProconXInputTE
 	ProconX360Bridge::ProconX360Bridge(
 		const char* procon_device_path,
 		ViGEm::ViGEmClient* client,
-		Options,
+		Options options,
 		std::function<void(const char*)> log)
 	{
 		x360_ = client->AddX360Controller();
@@ -33,9 +33,21 @@ namespace ProconXInputTE
 			last_output_.store({Clock::now(), x360Output}, std::memory_order_release);
 		});
 
-		controller_->SetInputStatusCallback([this](const InputStatus& input)
+		controller_->SetInputStatusCallback([this, use_x360_layout = options.ReplaceButtonsAsX360Layout](const InputStatus& in)
 		{
 			auto timestamp = Clock::now();
+			InputStatus input = in;
+
+			if (use_x360_layout)
+			{
+				auto a = input.Buttons.AButton;
+				input.Buttons.AButton = input.Buttons.BButton;
+				input.Buttons.BButton = a;
+
+				auto x = input.Buttons.XButton;
+				input.Buttons.XButton = input.Buttons.YButton;
+				input.Buttons.YButton = x;
+			}
 
 			X360InputStatus status =
 			{
