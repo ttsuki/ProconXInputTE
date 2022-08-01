@@ -27,9 +27,28 @@
 static void SetupConsoleWindow();
 static void WaitEscapeOrCtrlC();
 
-int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[])
+int main(int argc, const char* argv[])
 {
 	SetupConsoleWindow();
+
+	struct CommandLineOptions
+	{
+		bool use_x360_layout{false};
+	} command_line_options = [](int argc, const char* argv[])
+		{
+			CommandLineOptions ret{};
+			std::vector<std::string> args(argv + 1, argv + argc);
+			for (auto&& s : args)
+			{
+				if (s == "--use-x360-layout") { ret.use_x360_layout = true; }
+				else
+				{
+					std::cerr << "Unknown command line option: " << s << std::endl;
+					std::exit(EXIT_FAILURE);
+				}
+			}
+			return ret;
+		}(argc, argv);
 
 	using namespace ProControllerHid;
 	using namespace ViGEm;
@@ -59,6 +78,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[])
 			const auto path = devices[i];
 
 			const auto options = ProconX360Bridge::Options{
+				command_line_options.use_x360_layout,
 			};
 
 			try
