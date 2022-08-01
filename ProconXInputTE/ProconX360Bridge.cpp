@@ -6,19 +6,21 @@ namespace ProconXInputTE
 {
 	using ProControllerHid::ProController;
 	using ProControllerHid::InputStatus;
-	using ViGEm::X360Controller;
 	using ViGEm::X360InputStatus;
 	using ViGEm::X360OutputStatus;
 
-	ProconX360Bridge::ProconX360Bridge(const char* procon_device_path, ::ViGEm::ViGEmClient* client)
+	ProconX360Bridge::ProconX360Bridge(
+		const char* procon_device_path,
+		ViGEm::ViGEmClient* client,
+		Options,
+		std::function<void(const char*)> log)
 	{
 		x360_ = client->AddX360Controller();
-		auto index = x360_->GetDeviceIndex();
 
 		controller_ = ProController::Connect(
 			procon_device_path,
 			false,
-			[index](const char* log) { std::cerr << "device[" << std::to_string(index) << "]: " << log << std::endl; }
+			std::move(log)
 		);
 
 		if (!controller_)
@@ -26,14 +28,15 @@ namespace ProconXInputTE
 
 		controller_->SetPlayerLed(static_cast<uint8_t>(1u << static_cast<int>(x360_->GetDeviceIndex())));
 
-
 		x360_->StartNotification([this](const X360OutputStatus& x360Output)
 		{
-			lastOutput_ = {GetCurrentTimestamp(), x360Output};
+			last_output_.store({Clock::now(), x360Output}, std::memory_order_release);
 		});
 
 		controller_->SetInputStatusCallback([this](const InputStatus& input)
 		{
+			auto timestamp = Clock::now();
+
 			X360InputStatus status =
 			{
 				{
@@ -62,57 +65,52 @@ namespace ProconXInputTE
 				static_cast<int16_t>(input.RightStick.X * 32767),
 				static_cast<int16_t>(input.RightStick.Y * 32767),
 			};
+
 			x360_->SendReport(status);
 
-			auto timestamp = GetCurrentTimestamp();
-			lastInput_ = {timestamp, input};
-			lastInputSent_ = {timestamp, status};
+			last_input_.store(input, std::memory_order_release);
+			last_input_sent_.store({timestamp, status}, std::memory_order_release);
 		});
 
-		rumble_thread_running_.test_and_set();
 		rumble_thread_ = std::thread([this]
 		{
 			auto clock = std::chrono::steady_clock::now();
+			decltype(RumbleStatus::Large) large{};
+			decltype(RumbleStatus::Small) small{};
+			rumble_thread_running_.test_and_set();
+
 			while (rumble_thread_running_.test_and_set())
 			{
-				large_rumble_value_.first = std::max<int>(large_rumble_value_.first - large_rumble_parameter_.Left.DecaySpeed, 0);
-				small_rumble_value_.first = std::max<int>(small_rumble_value_.first - small_rumble_parameter_.Left.DecaySpeed, 0);
-				large_rumble_value_.second = std::max<int>(large_rumble_value_.second - large_rumble_parameter_.Right.DecaySpeed, 0);
-				small_rumble_value_.second = std::max<int>(small_rumble_value_.second - small_rumble_parameter_.Right.DecaySpeed, 0);
-				{
-					auto o = lastOutput_.load();
-					large_rumble_value_.first = std::max<int>(large_rumble_value_.first, o.second.LargeRumble);
-					small_rumble_value_.first = std::max<int>(small_rumble_value_.first, o.second.SmallRumble);
-					large_rumble_value_.second = std::max<int>(large_rumble_value_.second, o.second.LargeRumble);
-					small_rumble_value_.second = std::max<int>(small_rumble_value_.second, o.second.SmallRumble);
-				}
+				const auto latest = last_output_.load(std::memory_order_acquire).Status;
 
-				controller_->SetRumbleBasic(
-					static_cast<uint8_t>(large_rumble_value_.first * large_rumble_parameter_.Left.MaxAmplitude / 255),
-					static_cast<uint8_t>(large_rumble_value_.second * large_rumble_parameter_.Right.MaxAmplitude / 255),
-					static_cast<uint8_t>(small_rumble_value_.first * small_rumble_parameter_.Left.MaxAmplitude / 255),
-					static_cast<uint8_t>(small_rumble_value_.second * small_rumble_parameter_.Right.MaxAmplitude / 255),
-					large_rumble_parameter_.Left.Frequency,
-					large_rumble_parameter_.Right.Frequency,
-					small_rumble_parameter_.Left.Frequency,
-					small_rumble_parameter_.Right.Frequency
-				);
+				large = {
+					std::max<int>(large.Left - large_rumble_parameter_.Left.DecaySpeed, latest.LargeRumble),
+					std::max<int>(large.Right - large_rumble_parameter_.Right.DecaySpeed, latest.LargeRumble)
+				};
 
-				{
-					lastOutputOut_ = {
-						GetCurrentTimestamp(), {
-							static_cast<uint8_t>(large_rumble_value_.first),
-							static_cast<uint8_t>(small_rumble_value_.first),
-							0
-						}
-					};
-				}
+				small = {
+					std::max<int>(small.Left - small_rumble_parameter_.Left.DecaySpeed, latest.SmallRumble),
+					std::max<int>(small.Right - small_rumble_parameter_.Right.DecaySpeed, latest.SmallRumble)
+				};
 
-				clock += std::chrono::milliseconds(16);
-				std::this_thread::sleep_until(clock);
+				const ProController::BasicRumble output = {
+					{
+						{small_rumble_parameter_.Left.Frequency, static_cast<uint8_t>(small.Left * small_rumble_parameter_.Left.MaxAmplitude / 255)},
+						{large_rumble_parameter_.Left.Frequency, static_cast<uint8_t>(large.Left * large_rumble_parameter_.Left.MaxAmplitude / 255)}
+					},
+					{
+						{small_rumble_parameter_.Right.Frequency, static_cast<uint8_t>(small.Right * small_rumble_parameter_.Right.MaxAmplitude / 255)},
+						{large_rumble_parameter_.Right.Frequency, static_cast<uint8_t>(large.Right * large_rumble_parameter_.Right.MaxAmplitude / 255)}
+					}
+				};
+
+				controller_->SetRumble(output);
+				last_output_sent_.store({Clock::now(), large, small, output}, std::memory_order_release);
+
+				std::this_thread::sleep_until(clock += std::chrono::milliseconds(16));
 			}
 
-			controller_->SetRumbleBasic(0, 0, 0, 0);
+			controller_->SetRumble(ProController::BasicRumble{});
 		});
 	}
 
@@ -124,5 +122,17 @@ namespace ProconXInputTE
 		rumble_thread_.join();
 		controller_.reset();
 		x360_.reset();
+		std::this_thread::sleep_for(std::chrono::milliseconds(10)); // waits for exit of x360 thread
+	}
+
+	int ProconX360Bridge::GetIndex() const
+	{
+		return static_cast<int>(x360_->GetDeviceIndex());
+	}
+
+	void ProconX360Bridge::SetRumbleParameter(RumbleParams large_to_low, RumbleParams small_to_high)
+	{
+		large_rumble_parameter_ = large_to_low;
+		small_rumble_parameter_ = small_to_high;
 	}
 }

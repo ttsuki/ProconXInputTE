@@ -49,23 +49,41 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[])
 	}
 	std::cout << "ViGEm Client Ready." << LF;
 
-	std::cout << "Finding all ProControllers..." LF;
-
-	auto devices = ProController::EnumerateProControllerDevicePaths();
 	std::vector<std::unique_ptr<ProconX360Bridge>> bridges;
-	for (size_t i = 0; i < devices.size(); i++)
 	{
-		const auto device = devices[i];
-		std::cout << "- Device found:" << LF;
-		std::cout << "  Path: " << device << LF;
-		bridges.emplace_back(std::make_unique<ProconX360Bridge>(device.c_str(), client.get()));
-		std::cout << "  Connected as Virtual X360 Controller" << " index[" << bridges.back()->GetIndex() << "]" << LF;
-	}
+		std::cout << "Finding all ProControllers..." << LF;
 
-	if (bridges.empty())
-	{
-		std::cout << "No Pro Controllers found." << LF;
-		return 1;
+		auto devices = ProController::EnumerateProControllerDevicePaths();
+		for (size_t i = 0; i < devices.size(); i++)
+		{
+			const auto path = devices[i];
+
+			const auto options = ProconX360Bridge::Options{
+			};
+
+			try
+			{
+				std::cout << "- Device found:" << LF;
+				std::cout << "  Path: " << path << LF;
+				const auto logger = [i](const char* text) { std::cout << "    ProCon[" << std::to_string(i) << "]: " << text << LF; };
+				bridges.emplace_back(std::make_unique<ProconX360Bridge>(path.c_str(), client.get(), options, logger));
+				std::cout << "  Connected as Virtual X360 Controller" << " index[" << bridges.back()->GetIndex() << "]" << LF;
+			}
+			catch (const std::exception& e)
+			{
+				std::cout << "  Error: " << e.what() << LF;
+			}
+			catch (...)
+			{
+				std::cout << "  Unknown error occurred." << LF;
+			}
+		}
+
+		if (bridges.empty())
+		{
+			std::cout << "No Pro Controllers found." << LF;
+			return 1;
+		}
 	}
 
 	std::cout << LF;
@@ -85,17 +103,17 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] const char* argv[])
 			output << LF;
 			for (auto&& b : bridges)
 			{
-				auto input = b->GetLastInput().second;         // controller input
-				auto outputIn = b->GetLastOutputIn().second;   // x360 input value
-				auto outputOut = b->GetLastOutputOut().second; // sent to controller value
+				auto input = b->GetLastInput();              // controller input
+				auto outputIn = b->GetLastOutputIn().Status; // x360 input value
+				auto outputOut = b->GetLastOutputOut();      // sent to controller value
 
 				output << b->GetIndex() << ">";
 				output << "Vib";
 				output << " L:"
-					<< std::setw(3) << static_cast<int>(outputOut.LargeRumble) << "/"
+					<< std::setw(3) << static_cast<int>(outputOut.Large.Left) << "/"
 					<< std::setw(3) << static_cast<int>(outputIn.LargeRumble);
 				output << " H:"
-					<< std::setw(3) << static_cast<int>(outputOut.SmallRumble) << "/"
+					<< std::setw(3) << static_cast<int>(outputOut.Small.Right) << "/"
 					<< std::setw(3) << static_cast<int>(outputIn.SmallRumble);
 				output << "  In " << InputStatusAsString(input);
 				output << LF;
