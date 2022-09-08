@@ -57,11 +57,11 @@
 
 - ViGEm C++ Client (RAII wrapper)
 
-    is in [ViGEmClient/](ViGEmClient/) directory.
+    is in [`ViGEmClient/`](ViGEmClient/) directory.
 
 - Pro Controller user-mode driver
 
-    is in [ProControllerHid](ProControllerHid/) directory.
+    is in [`ProControllerHid/`](https://github.com/ttsuki/ProControllerHid) submodule.
 
     - It supports sticks/buttons input, 6-axis IMU sensor input, and basic rumbling output.
 

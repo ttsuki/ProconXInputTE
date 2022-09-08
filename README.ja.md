@@ -57,7 +57,7 @@ ViGEm busを経由して、USB接続のNintendo Switch Pro ControllerをXBox con
 
 - Pro Controller user-mode driver
 
-    [`ProControllerHid/`](ProControllerHid/) ディレクトリにあります。
+    [`ProControllerHid/`](https://github.com/ttsuki/ProControllerHid) ディレクトリにあります。
 
     - スティック・ボタン入力の他、6軸IMU(加速度・ジャイロ)センサ入力、振動出力をサポートしています。
 
